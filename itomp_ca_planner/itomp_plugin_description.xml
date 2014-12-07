@@ -1,0 +1,6 @@
+<library path="lib/libitomp_ca_planner_plugin">
+  <class name="itomp_ca_planner/ItompPlanner" type="itomp_ca_planner::ITOMPPlannerManager" base_class_type="planning_interface::PlannerManager">
+    <description>
+    </description>
+  </class>
+</library>

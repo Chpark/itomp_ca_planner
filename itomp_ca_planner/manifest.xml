@@ -1,0 +1,26 @@
+<package>
+  <description brief="itomp_ca_planner">
+
+     itomp_ca_planner
+
+  </description>
+  <author>Chonhyon Park</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/itomp_ca_planner</url>
+  <depend package="roscpp"/>
+  <depend package="orocos_kdl"/>
+  <depend package="kdl_parser"/>
+  <depend package="angles"/>
+  <depend package="visualization_msgs"/>
+  <depend package="tf"/>
+  <depend package="sensor_msgs"/>
+  <depend package="trajectory_msgs"/>
+  <depend package="filters"/>
+  <depend package="moveit_core"/>
+  <depend package="moveit_ros_planning"/>
+  <depend package="ecl_geometry"/>
+
+</package>
+
+
