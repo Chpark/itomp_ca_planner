@@ -1,7 +1,6 @@
 // Original code from pr2_moveit_tutorials::motion_planning_api_tutorial.cpp
 #include <pluginlib/class_loader.h>
 #include <ros/ros.h>
-
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/planning_interface/planning_interface.h>
 #include <moveit/planning_scene/planning_scene.h>
@@ -39,7 +38,6 @@ MoveKuka::~MoveKuka()
 
 void MoveKuka::run(const std::string& group_name)
 {
-
 	group_name_ = group_name;
 
 	robot_model_loader::RobotModelLoader robot_model_loader(
