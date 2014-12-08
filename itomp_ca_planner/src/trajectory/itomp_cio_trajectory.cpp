@@ -6,6 +6,7 @@
 #include <ros/console.h>
 #include <ros/assert.h>
 #include <ecl/geometry/polynomial.hpp>
+#include <ecl/geometry.hpp>
 
 using namespace std;
 
@@ -156,13 +157,6 @@ void ItompCIOTrajectory::init()
 	}
 	contact_start_points_.push_back(end_index_ + 1);
 	ROS_ASSERT(contact_start_points_.size() == num_contact_phases_);
-
-	ROS_INFO("Contact Phases");
-	for (int i = 0; i < num_contact_phases_; ++i)
-	{
-		ROS_INFO(
-				"Phase %d : %d - %d", i, contact_start_points_[i], contact_start_points_[i + 1] - 1);
-	}
 }
 
 void ItompCIOTrajectory::updateFromGroupTrajectory(
@@ -588,39 +582,60 @@ void ItompCIOTrajectory::fillInMinJerk(int trajectory_index,
 				(*this)(i, j) = poly(i * discretization_);
 			}
 
-			/*
-			// interpolate between waypoints
-			for (int k = 0; k < num_constraint_points - 1; ++k)
+			ecl::CubicSpline cubic;
+			ecl::Array<double> array_x(num_constraint_points);
+			ecl::Array<double> array_y(num_constraint_points);
+			for (int k = 0; k < num_constraint_points; ++k)
 			{
 				int point = k + traj_constraint_begin;
 
-				double x0 =
+				array_x[k] = (double) std::min(safeToInt(k * interval),
+						num_points - 1);
+				array_y[k] =
 						trajectory_constraints.constraints[point].joint_constraints[constraint_index].position;
-				double v0 = 0.0;
-				double a0 = 0.0;
-
-				double x1 =
-						trajectory_constraints.constraints[point + 1].joint_constraints[constraint_index].position;
-				double v1 = 0.0;
-				double a1 = 0.0;
-
-				double interp_begin = (double) safeToInt(k * interval);
-				double interp_end = (double) std::min(
-						safeToInt((k + 1) * interval), num_points - 1);
-
-				ecl::QuinticPolynomial poly;
-				poly = ecl::QuinticPolynomial::Interpolation(interp_begin, x0,
-						v0, a0, interp_end, x1, v1, a1);
-				for (int i = std::max(1, safeToInt(k * interval));
-						i
-								<= std::min(safeToInt(((k + 1) * interval)),
-										getNumPoints() - 1); ++i)
-				{
-					double value = poly(i);
-					(*this)(i, j) = value;
-				}
 			}
-			*/
+			cubic = ecl::CubicSpline::Natural(array_x, array_y);
+			for (int i = 0; i < getNumPoints() - 1; ++i)
+			{
+				double value = cubic((double) i);
+				(*this)(i, j) = value;
+			}
+
+			/*
+			 // interpolate between waypoints
+			 for (int k = 0; k < num_constraint_points - 1; ++k)
+			 {
+			 int point = k + traj_constraint_begin;
+
+			 double x0 =
+			 trajectory_constraints.constraints[point].joint_constraints[constraint_index].position;
+			 double v0 = 0.0;
+			 double a0 = 0.0;
+
+			 double x1 =
+			 trajectory_constraints.constraints[point + 1].joint_constraints[constraint_index].position;
+			 double v1 = 0.0;
+			 double a1 = 0.0;
+
+			 double interp_begin = (double) safeToInt(k * interval);
+			 double interp_end = (double) std::min(
+			 safeToInt((k + 1) * interval), num_points - 1);
+
+			 ecl::QuinticPolynomial poly;
+			 poly = ecl::QuinticPolynomial::Interpolation(interp_begin, x0,
+			 v0, a0, interp_end, x1, v1, a1);
+
+			 for (int i = std::max(1, safeToInt(k * interval));
+			 i
+			 <= std::min(safeToInt(((k + 1) * interval)),
+			 getNumPoints() - 1); ++i)
+			 {
+			 double value = poly(i);
+			 (*this)(i, j) = value;
+			 }
+			 }
+			 */
+
 		}
 		++group_joint_index;
 	}

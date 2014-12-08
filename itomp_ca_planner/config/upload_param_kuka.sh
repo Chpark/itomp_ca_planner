@@ -1,2 +1,2 @@
 #!/bin/sh
-rosparam load `rospack find itomp_cio_planner`/config/params_kuka.yaml itomp_planner
+rosparam load `rospack find itomp_ca_planner`/config/params_kuka.yaml itomp_planner
