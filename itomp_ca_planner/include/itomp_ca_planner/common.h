@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <iostream>
 #include <sstream>
+#include <limits>
 #include <stddef.h>
 #include <math.h>
 #include <omp.h>

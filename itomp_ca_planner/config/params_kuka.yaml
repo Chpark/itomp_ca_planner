@@ -4,6 +4,14 @@ max_iterations: 2000
 max_iterations_after_collision_free: 0
 num_trajectories: 8
 
+precomputation_init_milestones: 1000
+precomputation_add_milestones: 1000
+precomputation_grow_milestones: 100
+precomputation_expand_milestones: 400
+precomputation_nn: 10
+precomputation_max_valid_segment_dist: 0.3
+draw_precomputation: false
+
 smoothness_cost_weight: 0.00001
 obstacle_cost_weight: 1.0
 torque_cost_weight: 0.0
@@ -25,7 +33,7 @@ temp: [1000.0, 1000.0, 0.0]
 
 print_planning_info: true
 
-animate_path: true
+animate_path: false
 animate_endeffector: true
 animate_endeffector_segment:
   lower_body: [tcp_1_link, tcp_2_link]

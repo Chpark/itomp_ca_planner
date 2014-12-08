@@ -50,6 +50,7 @@ src/optimization/evaluation_data.cpp
 src/optimization/improvement_manager.cpp
 src/optimization/improvement_manager_chomp.cpp
 src/optimization/rollout.cpp
+src/precomputation/precomputation.cpp
 )
 set(LIBRARY_INPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 

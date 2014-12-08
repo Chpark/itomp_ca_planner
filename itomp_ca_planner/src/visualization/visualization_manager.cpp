@@ -795,18 +795,13 @@ void VisualizationManager::animateCoM(int numFreeVars, int freeVarStartIndex,
 }
 
 void VisualizationManager::animatePath(int trajectory_index,
-		const ItompCIOTrajectory* traj, bool is_best)
+		const ItompCIOTrajectory* traj, bool is_best, const std::string& group_name)
 {
 	if (!is_best)
 		return;
 
 	std::vector<std::string> link_names =
-			robot_model_->getRobotModel()->getJointModelGroup("lower_body")->getLinkModelNames();
-	/*
-	std::vector<std::string> link_names2 =
-			robot_model_->getRobotModel()->getJointModelGroup("gripper")->getLinkModelNames();
-	link_names.insert(link_names.end(), link_names2.begin(), link_names2.end());
-	*/
+			robot_model_->getRobotModel()->getJointModelGroup(group_name)->getLinkModelNames();
 	link_names.push_back("tool");
 
 	std_msgs::ColorRGBA WHITE, YELLOW, RED;
@@ -838,12 +833,7 @@ void VisualizationManager::animatePath(int trajectory_index,
 				ma_point.markers.end());
 	}
 	int marker_size = ma.markers.size();
-	/*
-	 for (int i = 0; i < marker_size; ++i)
-	 {
-	 ma.markers[i].id += trajectory_index * marker_size;
-	 }
-	 */
+
 	vis_marker_array_publisher_.publish(ma);
 
 }

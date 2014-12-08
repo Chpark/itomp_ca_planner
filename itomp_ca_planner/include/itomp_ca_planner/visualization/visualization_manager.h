@@ -41,7 +41,7 @@ public:
 			const std::vector<std::vector<KDL::Frame> >& segmentFrames,
 			bool best);
 	void animatePath(int trajectory_index, const ItompCIOTrajectory* traj,
-			bool is_best);
+			bool is_best, const std::string& group_name);
 
 	void publish(const visualization_msgs::Marker& msg);
 	void publish(const visualization_msgs::MarkerArray& msg);

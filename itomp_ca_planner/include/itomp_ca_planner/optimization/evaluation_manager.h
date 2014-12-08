@@ -77,8 +77,6 @@ public:
   const ItompCIOTrajectory* getFullTrajectoryConst() const;
   const ItompPlanningGroup* getPlanningGroup() const;
 
-  void postprocess_ik();
-
   double getTrajectoryCost(bool verbose = false);
 
   const EvaluationData& getDefaultData() const;
@@ -164,9 +162,6 @@ private:
   // TODO: refactoring
   int getSegmentIndex(int link, bool isLeft) const;
   void getJointIndex(int& groupIndex, int& kdlIndex, int joint, bool isLeft) const;
-  void computeBaseFrames(KDL::JntArray& curJointArray, int point);
-  void ComputeCollisionFreeLegUsingIK(int legIndex, const KDL::Vector& rootPos, const KDL::Frame& destPose,
-      KDL::JntArray& curJointArray, int point, bool support = true, bool updatePhase = false);
   KDL::JntArray phaseJointArray_[3];
 
   // for debug
