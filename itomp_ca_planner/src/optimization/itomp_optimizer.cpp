@@ -71,13 +71,15 @@ bool ItompOptimizer::optimize()
 
 	int iteration_after_solution = 0;
 	int num_iterations = PlanningParameters::getInstance()->getMaxIterations();
-	if (evaluation_manager_.getPlanningGroup()->name_ == "torso")
-		num_iterations = 0;
 	if (!evaluation_manager_.isLastTrajectoryFeasible())
 	{
-		while (iteration_ < num_iterations
-				&& !best_cost_manager_->isSolutionFound())
+		while (iteration_ < num_iterations)
 		{
+			if (best_cost_manager_->isSolutionFound())
+			{
+					break;
+			}
+
 			improvement_manager_->runSingleIteration(iteration_);
 			is_feasible = evaluation_manager_.isLastTrajectoryFeasible();
 			bool is_updated = updateBestTrajectory(
@@ -87,14 +89,15 @@ bool ItompOptimizer::optimize()
 					trajectory_index_, best_group_trajectory_cost_,
 					is_feasible);
 
-			/*
-			 if (is_feasible)
-			 {
-			 ++iteration_after_solution;
-			 if (iteration_after_solution > PlanningParameters::getInstance()->getMaxIterationsAfterCollisionFree())
-			 break;
-			 }
-			 */
+			if (is_feasible)
+			{
+				++iteration_after_solution;
+				/*
+				 if (iteration_after_solution
+				 > PlanningParameters::getInstance()->getMaxIterationsAfterCollisionFree())
+				 break;
+				 */
+			}
 
 			if (!is_updated)
 			{
@@ -105,7 +108,8 @@ bool ItompOptimizer::optimize()
 
 			++iteration_;
 
-			evaluation_manager_.render(trajectory_index_, is_updated && is_best_trajectory);
+			evaluation_manager_.render(trajectory_index_,
+					is_updated && is_best_trajectory);
 
 			if (is_updated && is_best_trajectory)
 				evaluation_manager_.printDebugInfo();

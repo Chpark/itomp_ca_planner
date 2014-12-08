@@ -518,6 +518,22 @@ void ItompCIOTrajectory::fillInMinJerk(int trajectory_index,
 	// temporary change
 	int num_constraint_points = traj_constraint_end - traj_constraint_begin;
 
+	std::vector<double> acc_dist(num_constraint_points);
+	acc_dist[0] = 0.0;
+	for (int i = 1; i < num_constraint_points; ++i)
+	{
+		double d = 0.0;
+		for (int k = 0;
+				k < trajectory_constraints.constraints[traj_constraint_begin].joint_constraints.size(); ++k)
+		{
+			double x0 =	trajectory_constraints.constraints[i - 1].joint_constraints[k].position;
+			double x1 =	trajectory_constraints.constraints[i].joint_constraints[k].position;
+			d += (x1 - x0) * (x1 - x0);
+		}
+		acc_dist[i] = acc_dist[i - 1] + sqrt(d);
+	}
+	double acc_dist_end = acc_dist[num_constraint_points - 1];
+
 	double interval = (double) num_points / (num_constraint_points - 1);
 
 	int group_joint_index = 0;
@@ -574,14 +590,6 @@ void ItompCIOTrajectory::fillInMinJerk(int trajectory_index,
 			double v1 = 0.0;
 			double a1 = 0.0;
 
-			ecl::QuinticPolynomial poly;
-			poly = ecl::QuinticPolynomial::Interpolation(0, x0, v0, a0,
-					duration_, x1, v1, a1);
-			for (int i = 1; i < getNumPoints(); ++i)
-			{
-				(*this)(i, j) = poly(i * discretization_);
-			}
-
 			ecl::CubicSpline cubic;
 			ecl::Array<double> array_x(num_constraint_points);
 			ecl::Array<double> array_y(num_constraint_points);
@@ -589,53 +597,18 @@ void ItompCIOTrajectory::fillInMinJerk(int trajectory_index,
 			{
 				int point = k + traj_constraint_begin;
 
-				array_x[k] = (double) std::min(safeToInt(k * interval),
-						num_points - 1);
+				array_x[k] = acc_dist[k];
 				array_y[k] =
 						trajectory_constraints.constraints[point].joint_constraints[constraint_index].position;
+				
 			}
 			cubic = ecl::CubicSpline::Natural(array_x, array_y);
 			for (int i = 0; i < getNumPoints() - 1; ++i)
 			{
-				double value = cubic((double) i);
+				double x = (double)i / (getNumPoints() - 1) * acc_dist_end;
+				double value = cubic(x);
 				(*this)(i, j) = value;
 			}
-
-			/*
-			 // interpolate between waypoints
-			 for (int k = 0; k < num_constraint_points - 1; ++k)
-			 {
-			 int point = k + traj_constraint_begin;
-
-			 double x0 =
-			 trajectory_constraints.constraints[point].joint_constraints[constraint_index].position;
-			 double v0 = 0.0;
-			 double a0 = 0.0;
-
-			 double x1 =
-			 trajectory_constraints.constraints[point + 1].joint_constraints[constraint_index].position;
-			 double v1 = 0.0;
-			 double a1 = 0.0;
-
-			 double interp_begin = (double) safeToInt(k * interval);
-			 double interp_end = (double) std::min(
-			 safeToInt((k + 1) * interval), num_points - 1);
-
-			 ecl::QuinticPolynomial poly;
-			 poly = ecl::QuinticPolynomial::Interpolation(interp_begin, x0,
-			 v0, a0, interp_end, x1, v1, a1);
-
-			 for (int i = std::max(1, safeToInt(k * interval));
-			 i
-			 <= std::min(safeToInt(((k + 1) * interval)),
-			 getNumPoints() - 1); ++i)
-			 {
-			 double value = poly(i);
-			 (*this)(i, j) = value;
-			 }
-			 }
-			 */
-
 		}
 		++group_joint_index;
 	}
