@@ -18,23 +18,31 @@
 namespace move_kuka
 {
 
-struct found_goal {}; // exception for termination
+struct found_goal
+{
+};
+// exception for termination
 // visitor that terminates when we find the goal
-template <class Vertex>
-class astar_goal_visitor : public boost::default_astar_visitor
+template<class Vertex>
+class astar_goal_visitor: public boost::default_astar_visitor
 {
 public:
-  astar_goal_visitor(Vertex goal) : m_goal(goal) {}
-  template <class Graph>
-  void examine_vertex(Vertex u, Graph& g) {
-    if(u == m_goal)
-      throw found_goal();
-  }
+	astar_goal_visitor(Vertex goal) :
+			m_goal(goal)
+	{
+	}
+	template<class Graph>
+	void examine_vertex(Vertex u, Graph& g)
+	{
+		if (u == m_goal)
+			throw found_goal();
+	}
 private:
-  Vertex m_goal;
+	Vertex m_goal;
 };
 
-inline bool pathCompare(const std::pair<std::vector<const robot_state::RobotState*>, double>& p1,
+inline bool pathCompare(
+		const std::pair<std::vector<const robot_state::RobotState*>, double>& p1,
 		const std::pair<std::vector<const robot_state::RobotState*>, double>& p2)
 {
 	return p1.second < p2.second;
@@ -61,10 +69,13 @@ public:
 	};
 	typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS,
 			boost::property<vertex_state_t, const robot_state::RobotState*,
-			boost::property<vertex_total_connection_attempts_t,	unsigned int,
-			boost::property<vertex_successful_connection_attempts_t, unsigned int> > >,
+					boost::property<vertex_total_connection_attempts_t,
+							unsigned int,
+							boost::property<
+									vertex_successful_connection_attempts_t,
+									unsigned int> > >,
 			boost::property<boost::edge_weight_t, double,
-			boost::property<edge_scaled_weight_t, double> > > Graph;
+					boost::property<edge_scaled_weight_t, double> > > Graph;
 	typedef boost::graph_traits<Graph>::vertex_descriptor Vertex;
 	typedef boost::graph_traits<Graph>::edge_descriptor Edge;
 
@@ -75,28 +86,21 @@ public:
 
 protected:
 	void loadStaticScene();
+	void initStartGoalStates(robot_state::RobotState& start_state,
+			std::vector<robot_state::RobotState>& goal_states);
 	bool isStateCollide(const robot_state::RobotState& state);
 	bool isStateSingular(robot_state::RobotState& state);
 
 	void plan(planning_interface::MotionPlanRequest& req,
 			planning_interface::MotionPlanResponse& res,
-			robot_state::RobotState& start_state,
-			robot_state::RobotState& goal_state);
-	void plan(planning_interface::MotionPlanRequest& req,
-			planning_interface::MotionPlanResponse& res,
-			robot_state::RobotState& start_state,
-			geometry_msgs::PoseStamped& goal_pose,
-			const std::string& endeffector_link);
-
-	void displayState(robot_state::RobotState& state);
-	void displayStates(robot_state::RobotState& start_state,
-			robot_state::RobotState& goal_state);
+			const robot_state::RobotState& start_state,
+			const robot_state::RobotState& goal_state);
 
 	void computeIKState(robot_state::RobotState& ik_state,
 			const Eigen::Affine3d& end_effector_state, bool rand = false);
 
-	void printTrajectory(const moveit_msgs::RobotTrajectory &traj);
-
+	void renderStartGoalStates(robot_state::RobotState& start_state,
+			robot_state::RobotState& goal_state);
 	void drawPath(int id, const Eigen::Vector3d& from,
 			const Eigen::Vector3d& to);
 	void drawEndeffectorPosition(int id, const Eigen::Vector3d& position);
@@ -104,7 +108,6 @@ protected:
 	ros::NodeHandle node_handle_;
 	robot_model::RobotModelPtr robot_model_;
 	planning_scene::PlanningScenePtr planning_scene_;
-	planning_interface::PlannerManagerPtr ompl_planner_instance_;
 	planning_interface::PlannerManagerPtr itomp_planner_instance_;
 
 	ros::Publisher planning_scene_diff_publisher_;
@@ -112,6 +115,8 @@ protected:
 	ros::Publisher vis_marker_array_publisher_;
 
 	std::string group_name_;
+
+	/////
 
 	void createRoadmap(int milestones);
 	void addStartState(const robot_state::RobotState& from);
@@ -135,7 +140,8 @@ protected:
 	boost::property_map<Graph, edge_scaled_weight_t>::type copiedWeightProperty_;
 
 	double costHeuristic(Vertex u, Vertex v) const;
-	double distance(const robot_state::RobotState* s1, const robot_state::RobotState* s2) const;
+	double distance(const robot_state::RobotState* s1,
+			const robot_state::RobotState* s2) const;
 	void renderPRMGraph();
 	void renderPaths();
 };

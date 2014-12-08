@@ -38,10 +38,6 @@ MoveKukaTest::MoveKukaTest(const ros::NodeHandle& node_handle) :
 
 MoveKukaTest::~MoveKukaTest()
 {
-	/*
-	 for(int i = 0; i < states_.size(); ++i)
-	 delete states_[i];
-	 */
 }
 
 void MoveKukaTest::run(const std::string& group_name)
@@ -60,6 +56,8 @@ void MoveKukaTest::run(const std::string& group_name)
 		sleep_t.sleep();
 		ROS_INFO("Waiting planning_scene subscribers");
 	}
+
+	loadStaticScene();
 
 	collision_detection::AllowedCollisionMatrix& acm =
 			planning_scene_->getAllowedCollisionMatrixNonConst();
@@ -107,37 +105,11 @@ void MoveKukaTest::run(const std::string& group_name)
 				"Exception while loading planner '" << planner_plugin_name << "': " << ex.what() << std::endl << "Available plugins: " << ss.str());
 	}
 
-	planner_plugin_name = "ompl_interface/OMPLPlanner";
-	try
-	{
-		ompl_planner_instance_.reset(
-				planner_plugin_loader->createUnmanagedInstance(
-						planner_plugin_name));
-		if (!ompl_planner_instance_->initialize(robot_model_,
-				node_handle_.getNamespace()))
-			ROS_FATAL_STREAM("Could not initialize planner instance");
-		ROS_INFO_STREAM(
-				"Using planning interface '" << ompl_planner_instance_->getDescription() << "'");
-	} catch (pluginlib::PluginlibException& ex)
-	{
-		const std::vector<std::string> &classes =
-				planner_plugin_loader->getDeclaredClasses();
-		std::stringstream ss;
-		for (std::size_t i = 0; i < classes.size(); ++i)
-			ss << classes[i] << " ";
-		ROS_ERROR_STREAM(
-				"Exception while loading planner '" << planner_plugin_name << "': " << ex.what() << std::endl << "Available plugins: " << ss.str());
-	}
-
 	display_publisher_ = node_handle_.advertise<moveit_msgs::DisplayTrajectory>(
 			"/move_group/display_planned_path", 1, true);
 	vis_marker_array_publisher_ = node_handle_.advertise<
 			visualization_msgs::MarkerArray>("visualization_marker_array", 100,
 			true);
-
-	// load scene
-
-	loadStaticScene();
 
 	ros::WallDuration sleep_time(0.01);
 	sleep_time.sleep();
@@ -146,56 +118,101 @@ void MoveKukaTest::run(const std::string& group_name)
 
 	moveit_msgs::DisplayTrajectory display_trajectory;
 	moveit_msgs::MotionPlanResponse response;
-	planning_interface::MotionPlanRequest req, req2;
+	planning_interface::MotionPlanRequest req;
 	planning_interface::MotionPlanResponse res;
 
-	req.workspace_parameters.min_corner.x =
-			req.workspace_parameters.min_corner.y =
-					req.workspace_parameters.min_corner.z = -10.0;
-	req.workspace_parameters.max_corner.x =
-			req.workspace_parameters.max_corner.y =
-					req.workspace_parameters.max_corner.z = 10.0;
+	createRoadmap(1000);
 
-	// Set start_state
-	std::map<std::string, double> values;
+	// Set start / goal states
 	robot_state::RobotState& start_state =
 			planning_scene_->getCurrentStateNonConst();
+	std::vector<robot_state::RobotState> goal_states;
+	goal_states.resize(10, planning_scene_->getCurrentStateNonConst());
+	initStartGoalStates(start_state, goal_states);
+
+	addStartState(start_state);
+	addGoalStates(goal_states);
+	renderPRMGraph();
+
+	while (extractPaths(8) == false)
+	{
+		createRoadmap(states_.size() + 1000);
+	}
+
+	// generate trajectories for optimization
+	req.trajectory_constraints.constraints.clear();
+	int traj_constraint_begin = 0;
+	const robot_state::RobotState& goal_state = *paths_[0].first.back();
+	for (int c = 0; c < M; ++c)
+	{
+		int num_joints = start_state.getVariableCount();
+		std::vector<double> positions(num_joints);
+
+		moveit_msgs::JointConstraint jc;
+		int num_points = paths_[c].first.size();
+		req.trajectory_constraints.constraints.resize(
+				traj_constraint_begin + num_points);
+		std::string trajectory_index_string = boost::lexical_cast < std::string
+				> (c);
+		for (int j = 0; j < num_points; ++j)
+		{
+			int point = j + traj_constraint_begin;
+			if (j == 0)
+				req.trajectory_constraints.constraints[point].name =
+						trajectory_index_string;
+			if (j == num_points - 1)
+				req.trajectory_constraints.constraints[point].name = "end";
+
+			req.trajectory_constraints.constraints[point].joint_constraints.resize(
+					num_joints);
+			for (int k = 0; k < num_joints; ++k)
+			{
+				jc.joint_name = start_state.getVariableNames()[k];
+				jc.position = paths_[c].first[j]->getVariablePosition(k);
+				req.trajectory_constraints.constraints[point].joint_constraints[k] =
+						jc;
+			}
+		}
+		traj_constraint_begin += num_points;
+	}
+
+	// trajectory optimization using ITOMP
+	plan(req, res, start_state, goal_state);
+	res.getMessage(response);
+
+	// display trajectories
+	display_trajectory.trajectory_start = response.trajectory_start;
+	display_trajectory.trajectory.push_back(response.trajectory);
+	display_publisher_.publish(display_trajectory);
+
+	// clean up
+	itomp_planner_instance_.reset();
+	planning_scene_.reset();
+	robot_model_.reset();
+
+	sleep_time.sleep();
+	ROS_INFO("Done");
+}
+
+void MoveKukaTest::initStartGoalStates(robot_state::RobotState& start_state,
+		std::vector<robot_state::RobotState>& goal_states)
+{
+	std::map<std::string, double> values;
 	const robot_state::JointModelGroup* joint_model_group =
 			start_state.getJointModelGroup(group_name_);
 
-	joint_model_group->getVariableDefaultPositions("idle", values);
-	start_state.setVariablePositions(values);
-	start_state.update();
-
-	// Setup a goal state
-	robot_state::RobotState goal_state(start_state);
-	joint_model_group->getVariableDefaultPositions("idle", values);
-	goal_state.setVariablePositions(values);
-	goal_state.update();
-
-	sleep_time.sleep();
-
-	// set internal states
-	start_state.update();
-	ROS_ASSERT(isStateCollide(start_state) == false);
-	std::vector<robot_state::RobotState> states(6, start_state);
-
+	std::vector<robot_state::RobotState> states(2, start_state);
 	const double INV_SQRT_2 = 1.0 / sqrt(2.0);
 	double EE_CONSTRAINTS[][7] =
 	{
-	{ .2, .05, 1.2, -0.5, 0.5, -0.5, 0.5 },
-	{ .2, .2, .85 + .1, -INV_SQRT_2, 0, 0, INV_SQRT_2 },
 	{ .2, .10, 1.2, -0.5, 0.5, -0.5, 0.5 },
-	{ .15, .2, .85 + .1, -INV_SQRT_2, 0, 0, INV_SQRT_2 },
-	{ .2, .15, 1.2, -0.5, 0.5, -0.5, 0.5 },
-	{ .1, .2, .85 + .1, -INV_SQRT_2, 0, 0, INV_SQRT_2 }, };
+	{ .15, .2, .85 + .1, -INV_SQRT_2, 0, 0, INV_SQRT_2 }, };
 
-	Eigen::Affine3d goal_transform[6];
+	Eigen::Affine3d goal_transform[2];
 	Eigen::Affine3d transform_1_inv =
 			robot_model_->getLinkModel("tcp_1_link")->getJointOriginTransform().inverse();
-	Eigen::Affine3d transform_2_inv =
-			robot_model_->getLinkModel("tcp_2_link")->getJointOriginTransform().inverse();
-	for (int i = 0; i < 6; ++i)
+
+	for (int i = 0; i < 2; ++i)
 	{
 		EE_CONSTRAINTS[i][0] -= 5.4 * 0.1;
 		EE_CONSTRAINTS[i][1] -= 1.9 * 0.1;
@@ -219,112 +236,21 @@ void MoveKukaTest::run(const std::string& group_name)
 		goal_transform[i].linear() = rot.toRotationMatrix();
 		goal_transform[i].translation() = trans;
 
-		goal_transform[i] = goal_transform[i]
-				* ((i % 2 == 0) ? transform_1_inv : transform_2_inv);
+		goal_transform[i] = goal_transform[i] * transform_1_inv;
 
 		states[i].update();
 		computeIKState(states[i], goal_transform[i]);
 	}
-	sleep_time.sleep();
 
-	createRoadmap(1000);
+	start_state = states[0];
+	robot_state::RobotState& goal_state = states[1];
 
-	// Plan 5 sub paths
-	for (int i = 2; i < 3; ++i)
+	renderStartGoalStates(start_state, goal_state);
+
+	for (int j = 0; j < goal_states.size(); ++j)
 	{
-		ROS_INFO("*** Planning Sequence %d ***", i);
-
-		robot_state::RobotState& from_state = states[i];
-		robot_state::RobotState& to_state = states[i + 1];
-		displayStates(from_state, to_state);
-
-		addStartState(from_state);
-		std::vector<robot_state::RobotState> to_states;
-		to_states.resize(10, to_state);
-		for (int j = 0; j < 10; ++j)
-		{
-			computeIKState(to_states[j], goal_transform[i + 1], true);
-
-			for (int k = 0; k < 7; ++k)
-				printf("%f ", to_states[j].getVariablePosition(k));
-			printf("\n");
-		}
-		addGoalStates(to_states);
-		renderPRMGraph();
-
-		while (extractPaths(8) == false)
-		{
-			createRoadmap(states_.size() + 1000);
-		}
-
-		req2.trajectory_constraints.constraints.clear();
-		int traj_constraint_begin = 0;
-
-		// generate trajectories for optimization
-		for (int c = 0; c < M; ++c)
-		{
-			int num_joints = from_state.getVariableCount();
-			std::vector<double> positions(num_joints);
-
-			moveit_msgs::JointConstraint jc;
-			int num_points = paths_[c].first.size();
-			req2.trajectory_constraints.constraints.resize(
-					traj_constraint_begin + num_points);
-			std::string trajectory_index_string = boost::lexical_cast
-					< std::string > (c);
-			for (int j = 0; j < num_points; ++j)
-			{
-				int point = j + traj_constraint_begin;
-				if (j == 0)
-					req2.trajectory_constraints.constraints[point].name =
-							trajectory_index_string;
-				if (j == num_points - 1)
-					req2.trajectory_constraints.constraints[point].name = "end";
-
-				req2.trajectory_constraints.constraints[point].joint_constraints.resize(
-						num_joints);
-				for (int k = 0; k < num_joints; ++k)
-				{
-					jc.joint_name = from_state.getVariableNames()[k];
-					jc.position = paths_[c].first[j]->getVariablePosition(k);
-					req2.trajectory_constraints.constraints[point].joint_constraints[k] =
-							jc;
-				}
-			}
-			traj_constraint_begin += num_points;
-		}
-
-		// plan using ITOMP
-		plan(req2, res, from_state, to_state);
-		res.getMessage(response);
-
-		int n = res.trajectory_->getWayPointCount();
-		for (int k = 0; k < n; ++k)
-		{
-			bool is_collide = isStateCollide(res.trajectory_->getWayPoint(k));
-			if (is_collide)
-				ROS_INFO("%d waypoint has collision", k);
-		}
-
-		if (i == 0)
-			display_trajectory.trajectory_start = response.trajectory_start;
-		display_trajectory.trajectory.push_back(response.trajectory);
+		computeIKState(goal_states[j], goal_transform[1], true);
 	}
-
-	// print trajectories
-	display_publisher_.publish(display_trajectory);
-	int num_trajectories = display_trajectory.trajectory.size();
-	for (int i = 0; i < num_trajectories; ++i)
-		printTrajectory(display_trajectory.trajectory[i]);
-
-	// clean up
-	itomp_planner_instance_.reset();
-	ompl_planner_instance_.reset();
-	planning_scene_.reset();
-	robot_model_.reset();
-
-	sleep_time.sleep();
-	ROS_INFO("Done");
 }
 
 bool MoveKukaTest::isStateSingular(robot_state::RobotState& state)
@@ -345,8 +271,8 @@ bool MoveKukaTest::isStateSingular(robot_state::RobotState& state)
 
 void MoveKukaTest::plan(planning_interface::MotionPlanRequest& req,
 		planning_interface::MotionPlanResponse& res,
-		robot_state::RobotState& start_state,
-		robot_state::RobotState& goal_state)
+		const robot_state::RobotState& start_state,
+		const robot_state::RobotState& goal_state)
 {
 	const robot_state::JointModelGroup* joint_model_group =
 			start_state.getJointModelGroup(group_name_);
@@ -385,76 +311,6 @@ void MoveKukaTest::plan(planning_interface::MotionPlanRequest& req,
 
 	planning_interface::PlanningContextPtr context =
 			itomp_planner_instance_->getPlanningContext(planning_scene_, req,
-					res.error_code_);
-	context->solve(res);
-	if (res.error_code_.val != res.error_code_.SUCCESS)
-	{
-		ROS_ERROR("Could not compute plan successfully");
-		return;
-	}
-}
-
-void MoveKukaTest::plan(planning_interface::MotionPlanRequest& req,
-		planning_interface::MotionPlanResponse& res,
-		robot_state::RobotState& start_state,
-		geometry_msgs::PoseStamped& goal_pose,
-		const std::string& endeffector_link)
-{
-	const robot_state::JointModelGroup* joint_model_group =
-			start_state.getJointModelGroup(group_name_);
-	req.group_name = group_name_;
-	req.allowed_planning_time = 3000.0;
-
-	// Copy from start_state to req.start_state
-	unsigned int num_joints = start_state.getVariableCount();
-	req.start_state.joint_state.name = start_state.getVariableNames();
-	req.start_state.joint_state.position.resize(num_joints);
-	req.start_state.joint_state.velocity.resize(num_joints);
-	req.start_state.joint_state.effort.resize(num_joints);
-	memcpy(&req.start_state.joint_state.position[0],
-			start_state.getVariablePositions(), sizeof(double) * num_joints);
-	if (start_state.hasVelocities())
-		memcpy(&req.start_state.joint_state.velocity[0],
-				start_state.getVariableVelocities(),
-				sizeof(double) * num_joints);
-	else
-		memset(&req.start_state.joint_state.velocity[0], 0,
-				sizeof(double) * num_joints);
-	if (start_state.hasAccelerations())
-		memcpy(&req.start_state.joint_state.effort[0],
-				start_state.getVariableAccelerations(),
-				sizeof(double) * num_joints);
-	else
-		memset(&req.start_state.joint_state.effort[0], 0,
-				sizeof(double) * num_joints);
-
-	planning_scene_->getCurrentStateNonConst().update();
-
-	// goal state
-	std::vector<double> tolerance_pose(3, 0.0001);
-	std::vector<double> tolerance_angle(3, 0.01);
-	moveit_msgs::Constraints pose_goal =
-			kinematic_constraints::constructGoalConstraints(endeffector_link,
-					goal_pose, tolerance_pose, tolerance_angle);
-	req.goal_constraints.clear();
-	req.goal_constraints.push_back(pose_goal);
-
-	moveit_msgs::OrientationConstraint oc;
-	oc.link_name = "tool";
-	oc.orientation.x = -0.5;
-	oc.orientation.y = -0.5;
-	oc.orientation.z = 0.5;
-	oc.orientation.w = 0.5;
-	oc.absolute_x_axis_tolerance = M_PI;
-	oc.absolute_y_axis_tolerance = M_PI;
-	oc.absolute_z_axis_tolerance = 5.0 * M_PI / 180.0;
-	oc.weight = 1.0;
-	oc.header.frame_id = robot_model_->getModelFrame();
-	oc.header.stamp = ros::Time::now();
-	//req.path_constraints.orientation_constraints.push_back(oc);
-
-	planning_interface::PlanningContextPtr context =
-			ompl_planner_instance_->getPlanningContext(planning_scene_, req,
 					res.error_code_);
 	context->solve(res);
 	if (res.error_code_.val != res.error_code_.SUCCESS)
@@ -527,42 +383,7 @@ void MoveKukaTest::loadStaticScene()
 	planning_scene_diff_publisher_.publish(planning_scene_msg);
 }
 
-void MoveKukaTest::displayState(robot_state::RobotState& state)
-{
-	std_msgs::ColorRGBA color;
-	color.a = 0.5;
-	color.r = 1.0;
-	color.g = 0.5;
-	color.b = 0.5;
-
-	int num_variables = state.getVariableNames().size();
-	static ros::Publisher state_display_publisher = node_handle_.advertise<
-			moveit_msgs::DisplayRobotState>("/move_itomp/display_state", 1,
-			true);
-	moveit_msgs::DisplayRobotState disp_state;
-	disp_state.state.joint_state.header.frame_id =
-			robot_model_->getModelFrame();
-	disp_state.state.joint_state.name = state.getVariableNames();
-	disp_state.state.joint_state.position.resize(num_variables);
-	memcpy(&disp_state.state.joint_state.position[0],
-			state.getVariablePositions(), sizeof(double) * num_variables);
-	disp_state.highlight_links.clear();
-	const std::vector<std::string>& link_model_names =
-			robot_model_->getLinkModelNames();
-	for (unsigned int i = 0; i < link_model_names.size(); ++i)
-	{
-		moveit_msgs::ObjectColor obj_color;
-		obj_color.id = link_model_names[i];
-		obj_color.color = color;
-		disp_state.highlight_links.push_back(obj_color);
-	}
-	state_display_publisher.publish(disp_state);
-
-	ros::WallDuration sleep_time(0.01);
-	sleep_time.sleep();
-}
-
-void MoveKukaTest::displayStates(robot_state::RobotState& start_state,
+void MoveKukaTest::renderStartGoalStates(robot_state::RobotState& start_state,
 		robot_state::RobotState& goal_state)
 {
 	// display start / goal states
@@ -588,12 +409,7 @@ void MoveKukaTest::displayStates(robot_state::RobotState& start_state,
 		color.r = 0.0;
 		color.g = 1.0;
 		color.b = 0.5;
-		/*
-		 color.a = 1.0;
-		 color.r = 1.0;
-		 color.g = 0.333;
-		 color.b = 0.0;
-		 */
+
 		moveit_msgs::ObjectColor obj_color;
 		obj_color.id = link_model_names[i];
 		obj_color.color = color;
@@ -656,7 +472,8 @@ void MoveKukaTest::computeIKState(robot_state::RobotState& ik_state,
 	int i = 0;
 
 	if (rand)
-		ik_state.setToRandomPositionsNearBy(joint_model_group, org_start, log(-3) / log(10));
+		ik_state.setToRandomPositionsNearBy(joint_model_group, org_start,
+				log(-3) / log(10));
 
 	while (true)
 	{
@@ -671,8 +488,6 @@ void MoveKukaTest::computeIKState(robot_state::RobotState& ik_state,
 
 		if (found_ik)
 			break;
-
-		displayState(ik_state);
 
 		++i;
 
@@ -689,30 +504,6 @@ void MoveKukaTest::computeIKState(robot_state::RobotState& ik_state,
 	{
 		ROS_INFO("Could not find IK solution");
 	}
-}
-
-void MoveKukaTest::printTrajectory(const moveit_msgs::RobotTrajectory &traj)
-{
-	int num_joints = traj.joint_trajectory.points[0].positions.size();
-	for (int k = 0; k < num_joints; ++k)
-	{
-		std::cout << traj.joint_trajectory.joint_names[k] << " ";
-	}
-	std::cout << std::endl;
-
-	int num_points = traj.joint_trajectory.points.size();
-	for (int j = 0; j < num_points; ++j)
-	{
-		std::cout << "[" << j << "] ";
-		for (int k = 0; k < num_joints; ++k)
-		{
-			double value = traj.joint_trajectory.points[j].positions[k];
-			std::cout << value << " ";
-		}
-		std::cout << std::endl;
-	}
-	std::cout << std::endl;
-
 }
 
 void MoveKukaTest::drawEndeffectorPosition(int id,
@@ -1345,13 +1136,6 @@ bool MoveKukaTest::extractPaths(int num_paths)
 			}
 			if (prev[goal_vertex] == goal_vertex)
 			{
-				ROS_INFO("Could not find solution path for goal %d\n", j);
-				for (int k = 0; k < 7; ++k)
-					printf("%f ",
-							stateProperty_[goal_vertex]->getVariablePosition(
-									k));
-				printf("\n");
-				//return false;
 				break;
 			}
 
@@ -1379,6 +1163,9 @@ bool MoveKukaTest::extractPaths(int num_paths)
 		{
 			weightProperty_[e] = copiedWeightProperty_[e];
 		}
+
+		if (paths_.size() != 0)
+			break;
 	}
 
 	if (paths_.size() == 0)
@@ -1387,7 +1174,6 @@ bool MoveKukaTest::extractPaths(int num_paths)
 		return false;
 	}
 
-	ROS_INFO("computed paths : %d", paths_.size());
 	sort(paths_.begin(), paths_.end(), pathCompare);
 	if (paths_.size() > num_paths)
 		paths_.resize(num_paths);
