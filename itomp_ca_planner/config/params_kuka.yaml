@@ -2,7 +2,7 @@ num_trials: 1
 planning_time_limit: 120.0
 max_iterations: 2000
 max_iterations_after_collision_free: 0
-num_trajectories: 8
+num_trajectories: 4
 
 precomputation_init_milestones: 1000
 precomputation_add_milestones: 1000
@@ -10,7 +10,7 @@ precomputation_grow_milestones: 100
 precomputation_expand_milestones: 400
 precomputation_nn: 10
 precomputation_max_valid_segment_dist: 0.3
-draw_precomputation: false
+draw_precomputation: true
 
 smoothness_cost_weight: 0.00001
 obstacle_cost_weight: 1.0

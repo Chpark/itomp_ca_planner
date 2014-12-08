@@ -71,7 +71,7 @@ bool ItompOptimizer::optimize()
 
 	int iteration_after_solution = 0;
 	int num_iterations = PlanningParameters::getInstance()->getMaxIterations();
-	if (!evaluation_manager_.isLastTrajectoryFeasible())
+	//if (!evaluation_manager_.isLastTrajectoryFeasible())
 	{
 		while (iteration_ < num_iterations)
 		{

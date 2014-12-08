@@ -802,7 +802,6 @@ void VisualizationManager::animatePath(int trajectory_index,
 
 	std::vector<std::string> link_names =
 			robot_model_->getRobotModel()->getJointModelGroup(group_name)->getLinkModelNames();
-	link_names.push_back("tool");
 
 	std_msgs::ColorRGBA WHITE, YELLOW, RED;
 	WHITE.a = 1.0;
