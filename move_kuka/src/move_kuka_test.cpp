@@ -134,7 +134,7 @@ void MoveKukaTest::run(const std::string& group_name)
 	addGoalStates(goal_states);
 	renderPRMGraph();
 
-	while (extractPaths(8) == false)
+	while (extractPaths(M) == false)
 	{
 		createRoadmap(states_.size() + 1000);
 	}
@@ -1110,6 +1110,7 @@ bool MoveKukaTest::extractPaths(int num_paths)
 {
 	paths_.clear();
 
+	double best_cost = numeric_limits<double>::max();
 	for (int j = 0; j < goal_vertices_.size(); ++j)
 	{
 		Vertex goal_vertex = goal_vertices_[j];
@@ -1153,6 +1154,15 @@ bool MoveKukaTest::extractPaths(int num_paths)
 			path.push_back(stateProperty_[start_vertex_]);
 			std::reverse(path.begin(), path.end());
 
+			if (i == 0)
+			{
+				if (path_cost > best_cost)
+					break;
+
+				best_cost = path_cost;
+				paths_.clear();
+			}
+
 			paths_.push_back(
 					std::make_pair<std::vector<const robot_state::RobotState*>,
 							double>(path, path_cost));
@@ -1163,9 +1173,6 @@ bool MoveKukaTest::extractPaths(int num_paths)
 		{
 			weightProperty_[e] = copiedWeightProperty_[e];
 		}
-
-		if (paths_.size() != 0)
-			break;
 	}
 
 	if (paths_.size() == 0)
