@@ -29,7 +29,7 @@ try
 }
 try
 {
-  itomp_planner_instance_.reset(planner_plugin_loader->createUnmanagedInstance(planner_plugin_name));
+  itomp_planner_instance_.reset(planner_plugin_loader->createUnmanagedInstance("itomp_ca_planner/ItompPlanner"));
   if (!itomp_planner_instance_->initialize(robot_model_, node_handle_.getNamespace()))
 	  ROS_FATAL_STREAM("Could not initialize planner instance");
   ROS_INFO_STREAM("Using planning interface '" << itomp_planner_instance_->getDescription() << "'");
