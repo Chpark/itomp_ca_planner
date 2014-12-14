@@ -330,6 +330,7 @@ void ItompPlannerNode::fillInResult(
 	res.trajectory_.reset(
 			new robot_trajectory::RobotTrajectory(robot_model_.getRobotModel(),
 					""));
+	res.trajectory_->setGroupName(planningGroups[0]);
 
 	std::vector<double> velocity_limits(num_all_joints,
 			std::numeric_limits<double>::max());
