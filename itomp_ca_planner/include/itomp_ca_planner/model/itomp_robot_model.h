@@ -78,6 +78,9 @@ public:
 	robot_model::RobotModelPtr getRobotModel();
 	robot_model::RobotModelConstPtr getRobotModel() const;
 
+	std::string getGroupEndeffectorLinkName(
+			const std::string& group_name) const;
+
 private:
 	robot_model::RobotModelPtr robot_model_;
 

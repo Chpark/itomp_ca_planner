@@ -188,4 +188,23 @@ bool ItompRobotModel::init(robot_model::RobotModelPtr& robot_model, const std::s
   return true;
 }
 
+std::string ItompRobotModel::getGroupEndeffectorLinkName(
+		const std::string& group_name) const
+{
+	const std::vector<const moveit::core::JointModelGroup*>& ees =
+				getRobotModel()->getEndEffectors();
+	std::string end_effector_name;
+	for (int i = 0; i < ees.size(); ++i)
+	{
+		const std::pair<std::string, std::string>& pg =
+				ees[i]->getEndEffectorParentGroup();
+		if (pg.first == group_name)
+		{
+			end_effector_name = pg.second;
+			break;
+		}
+	}
+	return end_effector_name;
+}
+
 }

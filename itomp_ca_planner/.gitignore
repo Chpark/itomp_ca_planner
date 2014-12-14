@@ -1,0 +1,6 @@
+/catkin/
+/catkin_generated/
+/devel/
+/gtest/
+/test_results/
+*.cmake

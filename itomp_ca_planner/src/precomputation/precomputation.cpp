@@ -665,6 +665,9 @@ void Precomputation::renderPaths()
 	const double scale = 0.005, scale2 = 0.001;
 	const int marker_step = 1;
 
+	const std::string end_effector_name =
+			robot_model_->getGroupEndeffectorLinkName(group_name_);
+
 	visualization_msgs::MarkerArray ma;
 	visualization_msgs::Marker::_color_type RED;
 	RED.a = 1.0;
@@ -707,7 +710,7 @@ void Precomputation::renderPaths()
 				test.updateLinkTransforms();
 
 				const Eigen::Affine3d& transform = test.getGlobalLinkTransform(
-						"tcp_1_link");
+					end_effector_name);
 
 				point.x = transform.translation()(0);
 				point.y = transform.translation()(1);
@@ -731,6 +734,9 @@ void Precomputation::renderPRMGraph()
 	const double trajectory_color_diff = 0.33;
 	const double scale = 0.005, scale2 = 0.001;
 	const int marker_step = 1;
+
+	const std::string end_effector_name =
+			robot_model_->getGroupEndeffectorLinkName(group_name_);
 
 	visualization_msgs::MarkerArray ma;
 	visualization_msgs::Marker::_color_type BLUE, GREEN, LIGHT_YELLOW;
@@ -765,7 +771,7 @@ void Precomputation::renderPRMGraph()
 	BOOST_FOREACH (Vertex v, boost::vertices(g_))
 	{
 		const Eigen::Affine3d& transform =
-				stateProperty_[v]->getGlobalLinkTransform("tcp_1_link");
+				stateProperty_[v]->getGlobalLinkTransform(end_effector_name);
 		point.x = transform.translation()(0);
 		point.y = transform.translation()(1);
 		point.z = transform.translation()(2);
@@ -792,7 +798,7 @@ void Precomputation::renderPRMGraph()
 		//continue;
 
 		const Eigen::Affine3d& transform =
-				stateProperty_[u]->getGlobalLinkTransform("tcp_1_link");
+				stateProperty_[u]->getGlobalLinkTransform(end_effector_name);
 
 		point.x = transform.translation()(0);
 		point.y = transform.translation()(1);
@@ -800,7 +806,7 @@ void Precomputation::renderPRMGraph()
 		msg.points.push_back(point);
 
 		const Eigen::Affine3d& transform2 =
-				stateProperty_[v]->getGlobalLinkTransform("tcp_1_link");
+				stateProperty_[v]->getGlobalLinkTransform(end_effector_name);
 		point.x = transform2.translation()(0);
 		point.y = transform2.translation()(1);
 		point.z = transform2.translation()(2);
