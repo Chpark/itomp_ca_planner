@@ -395,24 +395,7 @@ bool ImprovementManagerChomp::generateRollouts(const std::vector<double>& noise_
       rollouts_[r].parameters_[d] = parameters_[d] + rollouts_[r].noise_[d];
     }
   }
-  // contact
-  const double maxContactValue = PlanningParameters::getInstance()->getContactVariableInitialValues()[0];
-  for (int d = 0; d < num_contact_dimensions_; ++d)
-  {
-    for (int r = 0; r < num_rollouts_gen_; ++r)
-    {
-      contact_noise_generators_[d].sample(tmp_contact_noise_[d]);
-      rollouts_[r].contact_noise_[d] = contact_noise_stddev[d] * tmp_contact_noise_[d];
-      for (int i = 0; i < tmp_contact_noise_[d].rows(); ++i)
-      {
-        if (rollouts_[r].contact_noise_[d](i) + contact_parameters_[d](i) > maxContactValue)
-          rollouts_[r].contact_noise_[d](i) = maxContactValue - contact_parameters_[d](i);
-        else if (rollouts_[r].contact_noise_[d](i) + contact_parameters_[d](i) < 0)
-          rollouts_[r].contact_noise_[d](i) = -contact_parameters_[d](i);
-      }
-      rollouts_[r].contact_parameters_[d] = contact_parameters_[d] + rollouts_[r].contact_noise_[d];
-    }
-  }
+
 
   return true;
 }
