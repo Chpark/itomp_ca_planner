@@ -171,9 +171,12 @@ inline void ItompRobotModel::jointStateToArray(const sensor_msgs::JointState &jo
 		if (kdl_number >= 0)
 		{
 			joint_array(kdl_number) = joint_state.position[i];
-			joint_vel_array(kdl_number) = joint_state.velocity[i];
-			joint_acc_array(kdl_number) = joint_state.effort[i];
-			ROS_INFO("%s : %f %f %f", name.c_str(), joint_state.position[i], joint_state.velocity[i], joint_state.effort[i]);
+			joint_vel_array(kdl_number) =
+					(joint_state.velocity.size() > i) ? joint_state.velocity[i] : 0.0;
+			joint_acc_array(kdl_number) =
+					(joint_state.effort.size() > i) ? joint_state.effort[i] : 0.0;
+			ROS_INFO("%s : %f %f %f", name.c_str(), joint_array(kdl_number),
+					joint_vel_array(kdl_number), joint_acc_array(kdl_number));
 		}
 	}
 }
