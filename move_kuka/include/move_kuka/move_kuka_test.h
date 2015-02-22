@@ -19,27 +19,28 @@ public:
 	MoveKukaTest(const ros::NodeHandle& node_handle);
 	~MoveKukaTest();
 
-	void run(const std::string& group_name);
+        void run(const std::string& group_name, bool use_itomp);
 
 protected:
 	void loadStaticScene();
 	void initStartGoalStates(robot_state::RobotState& start_state,
-			std::vector<robot_state::RobotState>& goal_states);
+                                                         std::vector<robot_state::RobotState>& goal_states);
 	bool isStateCollide(const robot_state::RobotState& state);
 	bool isStateSingular(robot_state::RobotState& state);
 
 	void plan(planning_interface::MotionPlanRequest& req,
-			planning_interface::MotionPlanResponse& res,
-			const robot_state::RobotState& start_state,
-			std::vector<robot_state::RobotState>& goal_states);
+                          planning_interface::MotionPlanResponse& res,
+                          const robot_state::RobotState& start_state,
+                          std::vector<robot_state::RobotState>& goal_states,
+                          bool use_itomp);
 
 	void computeIKState(robot_state::RobotState& ik_state,
-			const Eigen::Affine3d& end_effector_state, bool rand = false);
+                                                const Eigen::Affine3d& end_effector_state, bool rand = false);
 
 	void renderStartGoalStates(robot_state::RobotState& start_state,
-			robot_state::RobotState& goal_state);
+                                                           robot_state::RobotState& goal_state);
 	void drawPath(int id, const Eigen::Vector3d& from,
-			const Eigen::Vector3d& to);
+                                  const Eigen::Vector3d& to);
 	void drawEndeffectorPosition(int id, const Eigen::Vector3d& position);
 
 	ros::NodeHandle node_handle_;
