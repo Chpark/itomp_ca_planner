@@ -336,7 +336,7 @@ void Precomputation::createRoadmap(int milestones)
 }
 
 bool Precomputation::localPlanning(const robot_state::RobotState& from,
-                                   const robot_state::RobotState& to, double distance)
+                                   const robot_state::RobotState& to, double distance) const
 {
 	const double LONGEST_VALID_SEGMENT_LENGTH =
         PlanningParameters::getInstance()->getPrecomputationMaxValidSegmentDist();
@@ -609,6 +609,8 @@ bool Precomputation::extractPaths(int num_paths)
 				paths_.clear();
 			}
 
+            path = smoothPath(path);
+
 			paths_.push_back(
                 std::make_pair<std::vector<const robot_state::RobotState*>,
                 double>(path, path_cost));
@@ -636,6 +638,32 @@ bool Precomputation::extractPaths(int num_paths)
 	sleep_time.sleep();
 
 	return true;
+}
+
+std::vector<const robot_state::RobotState*> Precomputation::smoothPath(const std::vector<const robot_state::RobotState*>& path) const
+{
+    std::vector<const robot_state::RobotState*> new_path;
+
+    if (path.size() == 0)
+        return new_path;
+
+    for (int i = 0; i < path.size(); )
+    {
+        new_path.push_back(path[i]);
+        int j;
+        for (j = i + 2; j < path.size(); ++j)
+        {
+            bool result = localPlanning(*path[i], *path[j], distance(path[i], path[j]));
+            ROS_INFO("Local planning between %d %d : %s", i, j, result ? "success" : "fail");
+            if (result == false)
+                break;
+        }
+        i = j - 1;
+    }
+
+    ROS_INFO("Path smoothing : %d -> %d", path.size(), new_path.size());
+
+    return new_path;
 }
 
 double Precomputation::distance(const robot_state::RobotState* s1,
