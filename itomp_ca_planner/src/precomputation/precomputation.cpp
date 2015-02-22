@@ -13,12 +13,14 @@
 namespace itomp_ca_planner
 {
 
+const std::string END_EFFECTOR_NAME = "tcp_1_link";
+
 Precomputation::Precomputation() :
-		stateProperty_(boost::get(vertex_state_t(), g_)), totalConnectionAttemptsProperty_(
-				boost::get(vertex_total_connection_attempts_t(), g_)), successfulConnectionAttemptsProperty_(
-				boost::get(vertex_successful_connection_attempts_t(), g_)), weightProperty_(
+    stateProperty_(boost::get(vertex_state_t(), g_)), totalConnectionAttemptsProperty_(
+        boost::get(vertex_total_connection_attempts_t(), g_)), successfulConnectionAttemptsProperty_(
+            boost::get(vertex_successful_connection_attempts_t(), g_)), weightProperty_(
 				boost::get(boost::edge_weight, g_)), copiedWeightProperty_(
-				boost::get(edge_scaled_weight_t(), g_))
+                    boost::get(edge_scaled_weight_t(), g_))
 {
 
 }
@@ -29,8 +31,8 @@ Precomputation::~Precomputation()
 }
 
 void Precomputation::initialize(
-		const planning_scene::PlanningSceneConstPtr& planning_scene,
-		const ItompRobotModel& robot_model, const std::string& group_name)
+    const planning_scene::PlanningSceneConstPtr& planning_scene,
+    const ItompRobotModel& robot_model, const std::string& group_name)
 {
 	planning_scene_ = planning_scene;
 	group_name_ = group_name;
@@ -42,7 +44,7 @@ void Precomputation::growRoadmap(int new_milestones)
 	int old_milestones = states_.size();
 
 	const robot_state::RobotState& current_state =
-			planning_scene_->getCurrentState();
+        planning_scene_->getCurrentState();
 
 	int dim = current_state.getVariableCount();
 
@@ -53,7 +55,7 @@ void Precomputation::growRoadmap(int new_milestones)
 	for (int i = old_milestones; i < milestones; ++i)
 	{
 		robot_state::RobotState* state = new robot_state::RobotState(
-				current_state);
+            current_state);
 		while (true)
 		{
 			state->setToRandomPositions();
@@ -70,31 +72,30 @@ void Precomputation::growRoadmap(int new_milestones)
 
 	// find nearest neighbors
 	flann::Matrix<double> dataset(new double[milestones * dim], milestones,
-			dim);
+                                  dim);
 	flann::Matrix<double> query(new double[new_milestones * dim],
-			new_milestones, dim);
+                                new_milestones, dim);
 	flann::Matrix<int> indices(new int[query.rows * NN], query.rows, NN);
 	flann::Matrix<double> dists(new double[query.rows * NN], query.rows, NN);
 	{
 		double* data_ptr = dataset.ptr();
 		for (int i = 0; i < milestones; ++i)
 		{
-			memcpy(data_ptr, states_[i]->getVariablePositions(),
-					sizeof(double) * dim);
+            memcpy(data_ptr, states_[i]->getVariablePositions(), sizeof(double) * dim);
 			data_ptr += dim;
 		}
 		double* query_ptr = query.ptr();
 		for (int i = 0; i < new_milestones; ++i)
 		{
 			memcpy(query_ptr,
-					states_[old_milestones + i]->getVariablePositions(),
-					sizeof(double) * dim);
+                   states_[old_milestones + i]->getVariablePositions(),
+                   sizeof(double) * dim);
 			query_ptr += dim;
 		}
 
 		// do a knn search, using flann libarary
 		flann::Index<flann::L2<double> > index(dataset,
-				flann::KDTreeIndexParams(4));
+                                               flann::KDTreeIndexParams(4));
 		index.buildIndex();
 		index.knnSearch(query, indices, dists, NN, flann::SearchParams(128));
 	}
@@ -128,20 +129,20 @@ void Precomputation::growRoadmap(int new_milestones)
 			if (index < i && index >= old_milestones)
 			{
 				std::map<std::pair<int, int>, bool>::const_iterator it =
-						local_planning_result.find(
-								std::make_pair<int, int>(index, i));
+                    local_planning_result.find(
+                        std::make_pair<int, int>(index, i));
 				if (it != local_planning_result.end())
 					continue;
 				else
 					result = localPlanning(*states_[i], *states_[index],
-							weight);
+                                           weight);
 			}
 			else
 			{
 				result = localPlanning(*states_[i], *states_[index], weight);
 				local_planning_result.insert(
-						std::make_pair<std::pair<int, int>, bool>(
-								std::make_pair<int, int>(i, index), result));
+                    std::make_pair<std::pair<int, int>, bool>(
+                        std::make_pair<int, int>(i, index), result));
 			}
 
 			totalConnectionAttemptsProperty_[graph_vertices[i]]++;
@@ -150,7 +151,7 @@ void Precomputation::growRoadmap(int new_milestones)
 			{
 				const Graph::edge_property_type properties(weight);
 				boost::add_edge(graph_vertices[i], graph_vertices[index],
-						properties, g_);
+                                properties, g_);
 				successfulConnectionAttemptsProperty_[graph_vertices[i]]++;
 				successfulConnectionAttemptsProperty_[graph_vertices[index]]++;
 			}
@@ -168,10 +169,10 @@ void Precomputation::expandRoadmap(int new_milestones)
 	const int NN = PlanningParameters::getInstance()->getPrecomputationNn() + 1;
 
 	const robot_state::RobotState& current_state =
-			planning_scene_->getCurrentState();
+        planning_scene_->getCurrentState();
 
 	const robot_state::JointModelGroup* joint_model_group =
-			current_state.getJointModelGroup(group_name_);
+        current_state.getJointModelGroup(group_name_);
 
 	int dim = current_state.getVariableCount();
 
@@ -194,7 +195,7 @@ void Precomputation::expandRoadmap(int new_milestones)
 	for (int i = old_milestones; i < milestones; ++i)
 	{
 		robot_state::RobotState* state = new robot_state::RobotState(
-				current_state);
+            current_state);
 
 		double r = (double) rand() / RAND_MAX * prob_acc;
 		std::map<double, Vertex>::iterator it = pdf.lower_bound(r);
@@ -204,12 +205,12 @@ void Precomputation::expandRoadmap(int new_milestones)
 		const robot_state::RobotState* s = stateProperty_[v];
 
 		const double LONGEST_VALID_SEGMENT_LENGTH =
-				PlanningParameters::getInstance()->getPrecomputationMaxValidSegmentDist();
+            PlanningParameters::getInstance()->getPrecomputationMaxValidSegmentDist();
 		while (true)
 		{
 
 			state->setToRandomPositionsNearBy(joint_model_group, *s,
-					LONGEST_VALID_SEGMENT_LENGTH * 0.5);
+                                              LONGEST_VALID_SEGMENT_LENGTH * 0.5);
 			state->updateCollisionBodyTransforms();
 
 			if (planning_scene_->isStateValid(*state))
@@ -222,9 +223,9 @@ void Precomputation::expandRoadmap(int new_milestones)
 
 	// find nearest neighbors
 	flann::Matrix<double> dataset(new double[milestones * dim], milestones,
-			dim);
+                                  dim);
 	flann::Matrix<double> query(new double[new_milestones * dim],
-			new_milestones, dim);
+                                new_milestones, dim);
 	flann::Matrix<int> indices(new int[query.rows * NN], query.rows, NN);
 	flann::Matrix<double> dists(new double[query.rows * NN], query.rows, NN);
 	{
@@ -232,21 +233,21 @@ void Precomputation::expandRoadmap(int new_milestones)
 		for (int i = 0; i < milestones; ++i)
 		{
 			memcpy(data_ptr, states_[i]->getVariablePositions(),
-					sizeof(double) * dim);
+                   sizeof(double) * dim);
 			data_ptr += dim;
 		}
 		double* query_ptr = query.ptr();
 		for (int i = 0; i < new_milestones; ++i)
 		{
 			memcpy(query_ptr,
-					states_[old_milestones + i]->getVariablePositions(),
-					sizeof(double) * dim);
+                   states_[old_milestones + i]->getVariablePositions(),
+                   sizeof(double) * dim);
 			query_ptr += dim;
 		}
 
 		// do a knn search, using flann libarary
 		flann::Index<flann::L2<double> > index(dataset,
-				flann::KDTreeIndexParams(4));
+                                               flann::KDTreeIndexParams(4));
 		index.buildIndex();
 		index.knnSearch(query, indices, dists, NN, flann::SearchParams(128));
 	}
@@ -280,20 +281,20 @@ void Precomputation::expandRoadmap(int new_milestones)
 			if (index < i && index >= old_milestones)
 			{
 				std::map<std::pair<int, int>, bool>::const_iterator it =
-						local_planning_result.find(
-								std::make_pair<int, int>(index, i));
+                    local_planning_result.find(
+                        std::make_pair<int, int>(index, i));
 				if (it != local_planning_result.end())
 					continue;
 				else
 					result = localPlanning(*states_[i], *states_[index],
-							weight);
+                                           weight);
 			}
 			else
 			{
 				result = localPlanning(*states_[i], *states_[index], weight);
 				local_planning_result.insert(
-						std::make_pair<std::pair<int, int>, bool>(
-								std::make_pair<int, int>(i, index), result));
+                    std::make_pair<std::pair<int, int>, bool>(
+                        std::make_pair<int, int>(i, index), result));
 			}
 
 			totalConnectionAttemptsProperty_[graph_vertices[i]]++;
@@ -302,7 +303,7 @@ void Precomputation::expandRoadmap(int new_milestones)
 			{
 				const Graph::edge_property_type properties(weight);
 				boost::add_edge(graph_vertices[i], graph_vertices[index],
-						properties, g_);
+                                properties, g_);
 				successfulConnectionAttemptsProperty_[graph_vertices[i]]++;
 				successfulConnectionAttemptsProperty_[graph_vertices[index]]++;
 			}
@@ -317,7 +318,7 @@ void Precomputation::expandRoadmap(int new_milestones)
 void Precomputation::createRoadmap()
 {
 	createRoadmap(
-			PlanningParameters::getInstance()->getPrecomputationInitMilestones());
+        PlanningParameters::getInstance()->getPrecomputationInitMilestones());
 }
 
 void Precomputation::createRoadmap(int milestones)
@@ -326,19 +327,19 @@ void Precomputation::createRoadmap(int milestones)
 	while (states_.size() < milestones)
 	{
 		growRoadmap(
-				PlanningParameters::getInstance()->getPrecomputationGrowMilestones());
+            PlanningParameters::getInstance()->getPrecomputationGrowMilestones());
 		expandRoadmap(
-				PlanningParameters::getInstance()->getPrecomputationExpandMilestones());
+            PlanningParameters::getInstance()->getPrecomputationExpandMilestones());
 
 		renderPRMGraph();
 	}
 }
 
 bool Precomputation::localPlanning(const robot_state::RobotState& from,
-		const robot_state::RobotState& to, double distance)
+                                   const robot_state::RobotState& to, double distance)
 {
 	const double LONGEST_VALID_SEGMENT_LENGTH =
-			PlanningParameters::getInstance()->getPrecomputationMaxValidSegmentDist();
+        PlanningParameters::getInstance()->getPrecomputationMaxValidSegmentDist();
 
 	bool result = true;
 	int nd = ceil(distance / LONGEST_VALID_SEGMENT_LENGTH);
@@ -391,7 +392,7 @@ void Precomputation::addStartState(const robot_state::RobotState& from)
 
 	// find nearest neighbors
 	flann::Matrix<double> dataset(new double[milestones * dim], milestones,
-			dim);
+                                  dim);
 	const flann::Matrix<double> query(new double[1 * dim], 1, dim);
 	flann::Matrix<int> indices(new int[query.rows * NN], query.rows, NN);
 	flann::Matrix<double> dists(new double[query.rows * NN], query.rows, NN);
@@ -400,7 +401,7 @@ void Precomputation::addStartState(const robot_state::RobotState& from)
 		for (int i = 0; i < milestones; ++i)
 		{
 			memcpy(data_ptr, states_[i]->getVariablePositions(),
-					sizeof(double) * dim);
+                   sizeof(double) * dim);
 			data_ptr += dim;
 		}
 
@@ -408,7 +409,7 @@ void Precomputation::addStartState(const robot_state::RobotState& from)
 
 		// do a knn search, using flann libarary
 		flann::Index<flann::L2<double> > index(dataset,
-				flann::KDTreeIndexParams(4));
+                                               flann::KDTreeIndexParams(4));
 		index.buildIndex();
 		index.knnSearch(query, indices, dists, NN, flann::SearchParams(128));
 	}
@@ -447,7 +448,7 @@ void Precomputation::addStartState(const robot_state::RobotState& from)
 			{
 				const Graph::edge_property_type properties(weight);
 				boost::add_edge(graph_vertices[i], graph_vertices[index],
-						properties, g_);
+                                properties, g_);
 			}
 		}
 	}
@@ -459,7 +460,7 @@ void Precomputation::addStartState(const robot_state::RobotState& from)
 }
 
 void Precomputation::addGoalStates(
-		const std::vector<robot_state::RobotState>& to)
+    const std::vector<robot_state::RobotState>& to)
 {
 	const int NN = PlanningParameters::getInstance()->getPrecomputationNn() + 1;
 
@@ -471,13 +472,13 @@ void Precomputation::addGoalStates(
 	int milestones = states_.size();
 	for (int i = 0; i < num_goal_states; ++i)
 		states_[milestones - num_goal_states + i] = new robot_state::RobotState(
-				to[i]);
+            to[i]);
 
 	// find nearest neighbors
 	flann::Matrix<double> dataset(new double[milestones * dim], milestones,
-			dim);
+                                  dim);
 	const flann::Matrix<double> query(new double[num_goal_states * dim],
-			num_goal_states, dim);
+                                      num_goal_states, dim);
 	flann::Matrix<int> indices(new int[query.rows * NN], query.rows, NN);
 	flann::Matrix<double> dists(new double[query.rows * NN], query.rows, NN);
 	{
@@ -485,20 +486,20 @@ void Precomputation::addGoalStates(
 		for (int i = 0; i < milestones; ++i)
 		{
 			memcpy(data_ptr, states_[i]->getVariablePositions(),
-					sizeof(double) * dim);
+                   sizeof(double) * dim);
 			data_ptr += dim;
 		}
 		double* query_ptr = query.ptr();
 		for (int i = 0; i < num_goal_states; ++i)
 		{
 			memcpy(query_ptr, to[i].getVariablePositions(),
-					sizeof(double) * dim);
+                   sizeof(double) * dim);
 			query_ptr += dim;
 		}
 
 		// do a knn search, using flann libarary
 		flann::Index<flann::L2<double> > index(dataset,
-				flann::KDTreeIndexParams(4));
+                                               flann::KDTreeIndexParams(4));
 		index.buildIndex();
 		index.knnSearch(query, indices, dists, NN, flann::SearchParams(128));
 	}
@@ -526,9 +527,9 @@ void Precomputation::addGoalStates(
 		for (int j = 1; j < NN; ++j)
 		{
 			int index = indices.ptr()[(i - (milestones - num_goal_states)) * NN
-					+ j];
+                                      + j];
 			double weight = sqrt(
-					dists.ptr()[(i - (milestones - num_goal_states)) * NN + j]);
+                                dists.ptr()[(i - (milestones - num_goal_states)) * NN + j]);
 
 			bool result = true;
 
@@ -539,7 +540,7 @@ void Precomputation::addGoalStates(
 			{
 				const Graph::edge_property_type properties(weight);
 				boost::add_edge(graph_vertices[i], graph_vertices[index],
-						properties, g_);
+                                properties, g_);
 			}
 		}
 	}
@@ -572,11 +573,12 @@ bool Precomputation::extractPaths(int num_paths)
 			try
 			{
 				boost::astar_search(g_, start_vertex_,
-						boost::bind(&Precomputation::costHeuristic, this, _1,
-								goal_vertex),
-						boost::predecessor_map(prev).visitor(
-								astar_goal_visitor<Vertex>(goal_vertex)));
-			} catch (found_goal&)
+                                    boost::bind(&Precomputation::costHeuristic, this, _1,
+                                                goal_vertex),
+                                    boost::predecessor_map(prev).visitor(
+                                        astar_goal_visitor<Vertex>(goal_vertex)));
+            }
+            catch (found_goal&)
 			{
 			}
 			if (prev[goal_vertex] == goal_vertex)
@@ -591,7 +593,7 @@ bool Precomputation::extractPaths(int num_paths)
 				path.push_back(stateProperty_[pos]);
 
 				const std::pair<Edge, bool>& ed = boost::edge(pos, prev[pos],
-						g_);
+                                                  g_);
 				path_cost += weightProperty_[ed.first];
 				weightProperty_[ed.first] *= 2.0;
 			}
@@ -608,8 +610,8 @@ bool Precomputation::extractPaths(int num_paths)
 			}
 
 			paths_.push_back(
-					std::make_pair<std::vector<const robot_state::RobotState*>,
-							double>(path, path_cost));
+                std::make_pair<std::vector<const robot_state::RobotState*>,
+                double>(path, path_cost));
 		}
 
 		// restore
@@ -637,7 +639,7 @@ bool Precomputation::extractPaths(int num_paths)
 }
 
 double Precomputation::distance(const robot_state::RobotState* s1,
-		const robot_state::RobotState* s2) const
+                                const robot_state::RobotState* s2) const
 {
 	double cost = 0.0;
 	int dim = s1->getVariableCount();
@@ -649,11 +651,33 @@ double Precomputation::distance(const robot_state::RobotState* s1,
 	return sqrt(cost);
 }
 
+double Precomputation::workspaceDistance(const robot_state::RobotState* s1,
+        const robot_state::RobotState* s2) const
+{
+    double cost = 0.0;
+
+    const Eigen::Affine3d& transform1 = s1->getGlobalLinkTransform(END_EFFECTOR_NAME);
+    const Eigen::Affine3d& transform2 = s2->getGlobalLinkTransform(END_EFFECTOR_NAME);
+
+    const Eigen::Vector3d& translation1 = transform1.translation();
+    const Eigen::Vector3d& translation2 = transform2.translation();
+    cost += (translation1 - translation2).norm();
+
+    return cost;
+}
+
 double Precomputation::costHeuristic(Vertex u, Vertex v) const
 {
 	const robot_state::RobotState* s1 = stateProperty_[u];
 	const robot_state::RobotState* s2 = stateProperty_[v];
 	return distance(s1, s2);
+}
+
+double Precomputation::costWorkspace(Vertex u, Vertex v) const
+{
+    const robot_state::RobotState* s1 = stateProperty_[u];
+    const robot_state::RobotState* s2 = stateProperty_[v];
+    return workspaceDistance(s1, s2);
 }
 
 void Precomputation::renderPaths()
@@ -689,7 +713,7 @@ void Precomputation::renderPaths()
 	msg.color = RED;
 
 	const double LONGEST_VALID_SEGMENT_LENGTH =
-			PlanningParameters::getInstance()->getPrecomputationMaxValidSegmentDist();
+        PlanningParameters::getInstance()->getPrecomputationMaxValidSegmentDist();
 	for (int j = 0; j < paths_.size(); ++j)
 	{
 		msg.points.resize(0);
@@ -707,7 +731,7 @@ void Precomputation::renderPaths()
 				test.updateLinkTransforms();
 
 				const Eigen::Affine3d& transform = test.getGlobalLinkTransform(
-						"tcp_1_link");
+                                                       "tcp_1_link");
 
 				point.x = transform.translation()(0);
 				point.y = transform.translation()(1);
@@ -720,7 +744,7 @@ void Precomputation::renderPaths()
 	}
 
 	VisualizationManager::getInstance()->getVisualizationMarkerArrayPublisher().publish(
-			ma);
+        ma);
 }
 
 void Precomputation::renderPRMGraph()
@@ -765,7 +789,7 @@ void Precomputation::renderPRMGraph()
 	BOOST_FOREACH (Vertex v, boost::vertices(g_))
 	{
 		const Eigen::Affine3d& transform =
-				stateProperty_[v]->getGlobalLinkTransform("tcp_1_link");
+            stateProperty_[v]->getGlobalLinkTransform("tcp_1_link");
 		point.x = transform.translation()(0);
 		point.y = transform.translation()(1);
 		point.z = transform.translation()(2);
@@ -792,7 +816,7 @@ void Precomputation::renderPRMGraph()
 		//continue;
 
 		const Eigen::Affine3d& transform =
-				stateProperty_[u]->getGlobalLinkTransform("tcp_1_link");
+            stateProperty_[u]->getGlobalLinkTransform("tcp_1_link");
 
 		point.x = transform.translation()(0);
 		point.y = transform.translation()(1);
@@ -800,7 +824,7 @@ void Precomputation::renderPRMGraph()
 		msg.points.push_back(point);
 
 		const Eigen::Affine3d& transform2 =
-				stateProperty_[v]->getGlobalLinkTransform("tcp_1_link");
+            stateProperty_[v]->getGlobalLinkTransform("tcp_1_link");
 		point.x = transform2.translation()(0);
 		point.y = transform2.translation()(1);
 		point.z = transform2.translation()(2);
@@ -810,22 +834,22 @@ void Precomputation::renderPRMGraph()
 	ma.markers.push_back(msg);
 
 	VisualizationManager::getInstance()->getVisualizationMarkerArrayPublisher().publish(
-			ma);
+        ma);
 
 	ros::WallDuration sleep_time(0.01);
 	sleep_time.sleep();
 }
 
 void Precomputation::extractInitialTrajectories(
-		moveit_msgs::TrajectoryConstraints& trajectory_constraints)
+    moveit_msgs::TrajectoryConstraints& trajectory_constraints)
 {
 	int num_trajectories =
-			PlanningParameters::getInstance()->getNumTrajectories();
+        PlanningParameters::getInstance()->getNumTrajectories();
 	while (extractPaths(num_trajectories) == false)
 	{
 		createRoadmap(
-				getNumMilestones()
-						+ PlanningParameters::getInstance()->getPrecomputationAddMilestones());
+            getNumMilestones()
+            + PlanningParameters::getInstance()->getPrecomputationAddMilestones());
 	}
 	trajectory_constraints.constraints.clear();
 	int traj_constraint_begin = 0;
@@ -838,7 +862,7 @@ void Precomputation::extractInitialTrajectories(
 		moveit_msgs::JointConstraint jc;
 		int num_points = paths_[c].first.size();
 		trajectory_constraints.constraints.resize(
-				traj_constraint_begin + num_points);
+            traj_constraint_begin + num_points);
 		std::string trajectory_index_string = boost::lexical_cast<std::string>(
 				c);
 		for (int j = 0; j < num_points; ++j)
@@ -846,19 +870,19 @@ void Precomputation::extractInitialTrajectories(
 			int point = j + traj_constraint_begin;
 			if (j == 0)
 				trajectory_constraints.constraints[point].name =
-						trajectory_index_string;
+                    trajectory_index_string;
 			if (j == num_points - 1)
 				trajectory_constraints.constraints[point].name = "end";
 
 			trajectory_constraints.constraints[point].joint_constraints.resize(
-					num_joints);
+                num_joints);
 			for (int k = 0; k < num_joints; ++k)
 			{
 				jc.joint_name =
-						planning_scene_->getCurrentState().getVariableNames()[k];
+                    planning_scene_->getCurrentState().getVariableNames()[k];
 				jc.position = paths_[c].first[j]->getVariablePosition(k);
 				trajectory_constraints.constraints[point].joint_constraints[k] =
-						jc;
+                    jc;
 			}
 		}
 		traj_constraint_begin += num_points;
