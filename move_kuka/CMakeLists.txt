@@ -8,9 +8,18 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 #  RelWithDebInfo : w/ debug symbols, w/ optimization
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
 #set(ROS_BUILD_TYPE RelWithDebInfo)
-set(ROS_BUILD_TYPE Debug)
+#set(ROS_BUILD_TYPE Debug)
+set(ROS_BUILD_TYPE Release)
 
 rosbuild_init()
+
+FIND_PACKAGE( OpenMP REQUIRED)
+if(OPENMP_FOUND)
+message("OPENMP FOUND")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+endif()
 
 #set the default path for built executables to the "bin" directory
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)

@@ -18,6 +18,7 @@
 #include <move_kuka/move_kuka_test.h>
 #include <fstream>
 #include <boost/lexical_cast.hpp>
+#include <sched.h>
 
 using namespace std;
 
@@ -83,9 +84,15 @@ void MoveKukaTest::run(const std::string& group_name, bool use_itomp)
 
 	try
 	{
-		itomp_planner_instance_.reset(
+        cpu_set_t mask;
+        if (sched_getaffinity(0, sizeof(cpu_set_t), &mask) != 0)
+            ROS_ERROR("sched_getaffinity failed");
+        itomp_planner_instance_.reset(
             planner_plugin_loader->createUnmanagedInstance(
                 planner_plugin_name));
+        if (sched_setaffinity(0, sizeof(cpu_set_t), &mask) != 0)
+            ROS_ERROR("sched_setaffinity failed");
+
 		if (!itomp_planner_instance_->initialize(robot_model_,
 				node_handle_.getNamespace()))
 			ROS_FATAL_STREAM("Could not initialize planner instance");
@@ -123,7 +130,7 @@ void MoveKukaTest::run(const std::string& group_name, bool use_itomp)
 	robot_state::RobotState& start_state =
         planning_scene_->getCurrentStateNonConst();
 	std::vector<robot_state::RobotState> goal_states;
-	goal_states.resize(10, planning_scene_->getCurrentStateNonConst());
+    goal_states.resize(100, planning_scene_->getCurrentStateNonConst());
 	initStartGoalStates(start_state, goal_states);
 
 	// trajectory optimization using ITOMP
