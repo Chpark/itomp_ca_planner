@@ -954,46 +954,36 @@ void Precomputation::renderPRMGraph()
 
 void Precomputation::extractInitialTrajectories(moveit_msgs::TrajectoryConstraints& trajectory_constraints)
 {
-	int num_trajectories =
-        PlanningParameters::getInstance()->getNumTrajectories();
+    int num_trajectories = PlanningParameters::getInstance()->getNumTrajectories();
 	while (extractPaths(num_trajectories) == false)
 	{
-		createRoadmap(
-            getNumMilestones()
-            + PlanningParameters::getInstance()->getPrecomputationAddMilestones());
+        createRoadmap(getNumMilestones() + PlanningParameters::getInstance()->getPrecomputationAddMilestones());
 	}
 	trajectory_constraints.constraints.clear();
 	int traj_constraint_begin = 0;
-	const robot_state::RobotState& goal_state = *paths_[0].first.back();
+
 	for (int c = 0; c < num_trajectories; ++c)
 	{
 		int num_joints = planning_scene_->getCurrentState().getVariableCount();
-		std::vector<double> positions(num_joints);
 
 		moveit_msgs::JointConstraint jc;
 		int num_points = paths_[c].first.size();
-		trajectory_constraints.constraints.resize(
-            traj_constraint_begin + num_points);
-		std::string trajectory_index_string = boost::lexical_cast<std::string>(
-				c);
+        trajectory_constraints.constraints.resize(traj_constraint_begin + num_points);
+        std::string trajectory_index_string = boost::lexical_cast<std::string>(c);
 		for (int j = 0; j < num_points; ++j)
 		{
 			int point = j + traj_constraint_begin;
 			if (j == 0)
-				trajectory_constraints.constraints[point].name =
-                    trajectory_index_string;
+                trajectory_constraints.constraints[point].name = trajectory_index_string;
 			if (j == num_points - 1)
 				trajectory_constraints.constraints[point].name = "end";
 
-			trajectory_constraints.constraints[point].joint_constraints.resize(
-                num_joints);
+            trajectory_constraints.constraints[point].joint_constraints.resize(num_joints);
 			for (int k = 0; k < num_joints; ++k)
 			{
-				jc.joint_name =
-                    planning_scene_->getCurrentState().getVariableNames()[k];
+                jc.joint_name = planning_scene_->getCurrentState().getVariableNames()[k];
 				jc.position = paths_[c].first[j]->getVariablePosition(k);
-				trajectory_constraints.constraints[point].joint_constraints[k] =
-                    jc;
+                trajectory_constraints.constraints[point].joint_constraints[k] = jc;
 			}
 		}
 		traj_constraint_begin += num_points;

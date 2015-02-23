@@ -19,26 +19,26 @@ inline int safeToInt(double a)
 }
 
 ItompCIOTrajectory::ItompCIOTrajectory(const ItompRobotModel* robot_model,
-		double duration, double discretization, double num_contacts,
-		double contact_phase_duration) :
-		robot_model_(robot_model), planning_group_(NULL), num_points_(
-				safeToInt(duration / discretization) + 1), num_joints_(
-				robot_model_->getNumKDLJoints()), discretization_(
+                                       double duration, double discretization, double num_contacts,
+                                       double contact_phase_duration) :
+    robot_model_(robot_model), planning_group_(NULL), num_points_(
+        safeToInt(duration / discretization) + 1), num_joints_(
+            robot_model_->getNumKDLJoints()), discretization_(
 				discretization), duration_(duration), num_contacts_(
-				num_contacts), start_index_(1), end_index_(num_points_ - 2), contact_phase_duration_(
-				contact_phase_duration), num_contact_phases_(
-				safeToInt(duration / contact_phase_duration) + 2), phase_stride_(
-				safeToInt(contact_phase_duration / discretization))
+                    num_contacts), start_index_(1), end_index_(num_points_ - 2), contact_phase_duration_(
+                        contact_phase_duration), num_contact_phases_(
+                            safeToInt(duration / contact_phase_duration) + 2), phase_stride_(
+                                safeToInt(contact_phase_duration / discretization))
 {
 	ROS_ASSERT(duration == duration_);
 	init();
 }
 
 ItompCIOTrajectory::ItompCIOTrajectory(const ItompCIOTrajectory& source_traj,
-		const ItompPlanningGroup* planning_group, int diff_rule_length) :
-		robot_model_(source_traj.robot_model_), planning_group_(planning_group), phase_stride_(
-				source_traj.phase_stride_), discretization_(
-				source_traj.discretization_)
+                                       const ItompPlanningGroup* planning_group, int diff_rule_length) :
+    robot_model_(source_traj.robot_model_), planning_group_(planning_group), phase_stride_(
+        source_traj.phase_stride_), discretization_(
+            source_traj.discretization_)
 {
 	// TODO: only contacts in this group?
 	num_contacts_ = source_traj.num_contacts_;
@@ -49,7 +49,7 @@ ItompCIOTrajectory::ItompCIOTrajectory(const ItompCIOTrajectory& source_traj,
 
 	int start_extra = (diff_rule_length - 1) - source_traj.start_index_;
 	int end_extra = (diff_rule_length - 1)
-			- ((source_traj.num_points_ - 1) - source_traj.end_index_);
+                    - ((source_traj.num_points_ - 1) - source_traj.end_index_);
 
 	num_points_ = source_traj.num_points_ + start_extra + end_extra;
 
@@ -84,7 +84,7 @@ ItompCIOTrajectory::~ItompCIOTrajectory()
 }
 
 void ItompCIOTrajectory::copyFromFullTrajectory(
-		const ItompCIOTrajectory& full_trajectory)
+    const ItompCIOTrajectory& full_trajectory)
 {
 	/*
 	 for (int i = 0; i < num_joints_; i++)
@@ -110,7 +110,7 @@ void ItompCIOTrajectory::copyFromFullTrajectory(
 		for (int j = 0; j < num_joints_; j++)
 		{
 			int source_joint =
-					planning_group_->group_joints_[j].kdl_joint_index_;
+                planning_group_->group_joints_[j].kdl_joint_index_;
 			(*this)(i, j) = full_trajectory(source_traj_point, source_joint);
 		}
 	}
@@ -142,11 +142,11 @@ void ItompCIOTrajectory::init()
 {
 	trajectory_ = Eigen::MatrixXd(num_points_, num_joints_);
 	contact_trajectory_ = Eigen::MatrixXd(num_contact_phases_ + 1,
-			num_contacts_);
+                                          num_contacts_);
 
 	free_trajectory_ = Eigen::MatrixXd(num_contact_phases_ + 1, num_joints_);
 	free_vel_trajectory_ = Eigen::MatrixXd::Zero(num_contact_phases_ + 1,
-			num_joints_);
+                           num_joints_);
 
 	contact_start_points_.clear();
 	contact_start_points_.push_back(0);
@@ -160,7 +160,7 @@ void ItompCIOTrajectory::init()
 }
 
 void ItompCIOTrajectory::updateFromGroupTrajectory(
-		const ItompCIOTrajectory& group_trajectory)
+    const ItompCIOTrajectory& group_trajectory)
 {
 	/*
 	 for (int i = 0; i < group_trajectory.planning_group_->num_joints_; i++)
@@ -180,10 +180,10 @@ void ItompCIOTrajectory::updateFromGroupTrajectory(
 	for (int i = 0; i < group_trajectory.planning_group_->num_joints_; i++)
 	{
 		int target_joint =
-				group_trajectory.planning_group_->group_joints_[i].kdl_joint_index_;
+            group_trajectory.planning_group_->group_joints_[i].kdl_joint_index_;
 		trajectory_.block(start_index_, target_joint, num_vars_free, 1) =
-				group_trajectory.trajectory_.block(
-						group_trajectory.start_index_, i, num_vars_free, 1);
+            group_trajectory.trajectory_.block(
+                group_trajectory.start_index_, i, num_vars_free, 1);
 	}
 
 	//contact_trajectory_ = group_trajectory.contact_trajectory_;
@@ -195,15 +195,15 @@ void ItompCIOTrajectory::updateFromGroupTrajectory(
 		// TODO: need to be changed when multiple groups have contacts;
 		int target_contact = i;
 		contact_trajectory_.block(contact_start_index, target_contact,
-				num_contact_vars_free, 1) =
-				group_trajectory.contact_trajectory_.block(contact_start_index,
-						i, num_contact_vars_free, 1);
+                                  num_contact_vars_free, 1) =
+                                      group_trajectory.contact_trajectory_.block(contact_start_index,
+                                              i, num_contact_vars_free, 1);
 	}
 }
 
 void ItompCIOTrajectory::updateFromGroupTrajectory(
-		const ItompCIOTrajectory& group_trajectory, int point_index,
-		int joint_index)
+    const ItompCIOTrajectory& group_trajectory, int point_index,
+    int joint_index)
 {
 	int i = joint_index;
 	/*
@@ -214,10 +214,10 @@ void ItompCIOTrajectory::updateFromGroupTrajectory(
 	 }
 	 */
 	int target_joint =
-			group_trajectory.planning_group_->group_joints_[i].kdl_joint_index_;
+        group_trajectory.planning_group_->group_joints_[i].kdl_joint_index_;
 	trajectory_.block(start_index_ + point_index, target_joint, 1, 1) =
-			group_trajectory.trajectory_.block(
-					group_trajectory.start_index_ + point_index, i, 1, 1);
+        group_trajectory.trajectory_.block(
+            group_trajectory.start_index_ + point_index, i, 1, 1);
 }
 
 void ItompCIOTrajectory::updateFreePointsFromTrajectory()
@@ -315,9 +315,9 @@ void ItompCIOTrajectory::updateTrajectoryFromFreePoint(int point_index,
 }
 
 void ItompCIOTrajectory::fillInMinJerk(
-		const std::set<int>& groupJointsKDLIndices,
-		const Eigen::MatrixXd::RowXpr joint_vel_array,
-		const Eigen::MatrixXd::RowXpr joint_acc_array)
+    const std::set<int>& groupJointsKDLIndices,
+    const Eigen::MatrixXd::RowXpr joint_vel_array,
+    const Eigen::MatrixXd::RowXpr joint_acc_array)
 {
 	ROS_INFO("Trajectory 0 use fillInMinJerk");
 
@@ -353,7 +353,7 @@ void ItompCIOTrajectory::fillInMinJerk(
 		{
 			if (std::abs((*this)(start_index, 0) - (*this)(end_index, 0)) > 1E-7
 					|| std::abs((*this)(start_index, 1) - (*this)(end_index, 1))
-							> 1E-7)
+                    > 1E-7)
 			{
 				hasRotation = true;
 				continue;
@@ -408,21 +408,25 @@ void ItompCIOTrajectory::fillInMinJerk(
 		double dir_angle = atan2(diff_y, diff_x) - M_PI * 0.5;
 
 		double interp_indices[] =
-		{ start_index, contact_start_points_[2] - 1,
-				contact_start_points_[contact_start_points_.size() - 3] - 1,
-				contact_start_points_[contact_start_points_.size() - 2] - 1,
-				end_index - 1 };
+        {
+            start_index, contact_start_points_[2] - 1,
+            contact_start_points_[contact_start_points_.size() - 3] - 1,
+            contact_start_points_[contact_start_points_.size() - 2] - 1,
+            end_index - 1
+        };
 		double interp_values[] =
-				{ (*this)(start_index, ROT_JOINT_INDEX), dir_angle, dir_angle,
-						(*this)(end_index, ROT_JOINT_INDEX), (*this)(end_index,
-								ROT_JOINT_INDEX) };
+        {
+            (*this)(start_index, ROT_JOINT_INDEX), dir_angle, dir_angle,
+            (*this)(end_index, ROT_JOINT_INDEX), (*this)(end_index,
+            ROT_JOINT_INDEX)
+        };
 
 		for (int idx = 0; idx < 4; ++idx)
 		{
 			double interp_start_index = interp_indices[idx];
 			double interp_end_index = interp_indices[idx + 1];
 			double duration = (interp_end_index - interp_start_index)
-					* discretization_;
+                              * discretization_;
 
 			double T[6]; // powers of the time duration
 			T[0] = 1.0;
@@ -448,11 +452,11 @@ void ItompCIOTrajectory::fillInMinJerk(
 				coeff[ROT_JOINT_INDEX][1] = v0;
 				coeff[ROT_JOINT_INDEX][2] = 0.5 * a0;
 				coeff[ROT_JOINT_INDEX][3] = (-1.5 * a0 - 6 * v0 - 10 * x0
-						+ 10 * x1);
+                                             + 10 * x1);
 				coeff[ROT_JOINT_INDEX][4] = (1.5 * a0 + 8 * v0 + 15 * x0
-						- 15 * x1);
+                                             - 15 * x1);
 				coeff[ROT_JOINT_INDEX][5] = (-0.5 * a0 - 3 * v0 - 6 * x0
-						+ 6 * x1);
+                                             + 6 * x1);
 			}
 
 			// now fill in the joint positions at each time step
@@ -480,11 +484,11 @@ void ItompCIOTrajectory::fillInMinJerk(
 }
 
 void ItompCIOTrajectory::fillInMinJerk(int trajectory_index,
-		const std::set<int>& groupJointsKDLIndices,
-		const ItompPlanningGroup* planning_group,
-		const moveit_msgs::TrajectoryConstraints& trajectory_constraints,
-		const Eigen::MatrixXd::RowXpr joint_vel_array,
-		const Eigen::MatrixXd::RowXpr joint_acc_array)
+                                       const std::set<int>& groupJointsKDLIndices,
+                                       const ItompPlanningGroup* planning_group,
+                                       const moveit_msgs::TrajectoryConstraints& trajectory_constraints,
+                                       const Eigen::MatrixXd::RowXpr joint_vel_array,
+                                       const Eigen::MatrixXd::RowXpr joint_acc_array)
 {
 	vel_start_ = joint_vel_array;
 	acc_start_ = joint_acc_array;
@@ -492,15 +496,13 @@ void ItompCIOTrajectory::fillInMinJerk(int trajectory_index,
 	//printTrajectory();
 	int num_points = getNumPoints();
 
-	std::string trajectory_index_string = boost::lexical_cast<std::string>(
-			trajectory_index);
+    std::string trajectory_index_string = boost::lexical_cast<std::string>(trajectory_index);
 	int traj_constraint_begin = 0;
 	int traj_constraint_end = trajectory_constraints.constraints.size();
 	int i = 0;
 	for (i = 0; i < trajectory_constraints.constraints.size(); ++i)
 	{
-		if (trajectory_constraints.constraints[i].name
-				== trajectory_index_string)
+        if (trajectory_constraints.constraints[i].name == trajectory_index_string)
 		{
 			traj_constraint_begin = i;
 			break;
@@ -518,42 +520,32 @@ void ItompCIOTrajectory::fillInMinJerk(int trajectory_index,
 	// temporary change
 	int num_constraint_points = traj_constraint_end - traj_constraint_begin;
 
-	std::vector<double> acc_dist(num_constraint_points);
-	acc_dist[0] = 0.0;
+    std::vector<double> accumulated_distances(num_constraint_points);
+    accumulated_distances[0] = 0.0;
 	for (int i = 1; i < num_constraint_points; ++i)
 	{
 		double d = 0.0;
-		for (int k = 0;
-				k < trajectory_constraints.constraints[traj_constraint_begin].joint_constraints.size(); ++k)
+        for (int k = 0; k < trajectory_constraints.constraints[traj_constraint_begin].joint_constraints.size(); ++k)
 		{
 			double x0 =	trajectory_constraints.constraints[i - 1].joint_constraints[k].position;
 			double x1 =	trajectory_constraints.constraints[i].joint_constraints[k].position;
 			d += (x1 - x0) * (x1 - x0);
 		}
-		acc_dist[i] = acc_dist[i - 1] + sqrt(d);
+        accumulated_distances[i] = accumulated_distances[i - 1] + std::sqrt(d);
 	}
-	double acc_dist_end = acc_dist[num_constraint_points - 1];
-
-	double interval = (double) num_points / (num_constraint_points - 1);
 
 	int group_joint_index = 0;
-	for (std::set<int>::const_iterator it = groupJointsKDLIndices.begin();
-			it != groupJointsKDLIndices.end(); ++it)
+    for (std::set<int>::const_iterator it = groupJointsKDLIndices.begin(); it != groupJointsKDLIndices.end(); ++it)
 	{
 		int j = *it;
 
 		bool has_constraints = false;
 		int constraint_index = -1;
-		for (int k = 0;
-				k
-						< trajectory_constraints.constraints[traj_constraint_begin].joint_constraints.size();
-				++k)
+        for (int k = 0; k < trajectory_constraints.constraints[traj_constraint_begin].joint_constraints.size(); ++k)
 		{
-
 			if (trajectory_constraints.constraints[traj_constraint_begin].joint_constraints[k].joint_name
 					== planning_group->group_joints_[group_joint_index].joint_name_)
 			{
-
 				has_constraints = true;
 				constraint_index = k;
 			}
@@ -570,8 +562,7 @@ void ItompCIOTrajectory::fillInMinJerk(int trajectory_index,
 			double a1 = 0.0;
 
 			ecl::QuinticPolynomial poly;
-			poly = ecl::QuinticPolynomial::Interpolation(0, x0, v0, a0,
-					duration_, x1, v1, a1);
+            poly = ecl::QuinticPolynomial::Interpolation(0, x0, v0, a0, duration_, x1, v1, a1);
 			for (int i = 1; i < getNumPoints() - 1; ++i)
 			{
 				(*this)(i, j) = poly(i * discretization_);
@@ -579,17 +570,6 @@ void ItompCIOTrajectory::fillInMinJerk(int trajectory_index,
 		}
 		else
 		{
-			double x0 =
-					trajectory_constraints.constraints[traj_constraint_begin].joint_constraints[constraint_index].position;
-			double v0 = 0.0;
-			double a0 = 0.0;
-
-			double x1 = trajectory_constraints.constraints[traj_constraint_end
-					- 1].joint_constraints[constraint_index].position;
-			;
-			double v1 = 0.0;
-			double a1 = 0.0;
-
 			ecl::CubicSpline cubic;
 			ecl::Array<double> array_x(num_constraint_points);
 			ecl::Array<double> array_y(num_constraint_points);
@@ -597,15 +577,13 @@ void ItompCIOTrajectory::fillInMinJerk(int trajectory_index,
 			{
 				int point = k + traj_constraint_begin;
 
-				array_x[k] = acc_dist[k];
-				array_y[k] =
-						trajectory_constraints.constraints[point].joint_constraints[constraint_index].position;
-				
+                array_x[k] = accumulated_distances[k];
+                array_y[k] = trajectory_constraints.constraints[point].joint_constraints[constraint_index].position;
 			}
 			cubic = ecl::CubicSpline::Natural(array_x, array_y);
 			for (int i = 0; i < getNumPoints() - 1; ++i)
 			{
-				double x = (double)i / (getNumPoints() - 1) * acc_dist_end;
+                double x = (double)i / (getNumPoints() - 1) * accumulated_distances.back();
 				double value = cubic(x);
 				(*this)(i, j) = value;
 			}
@@ -616,23 +594,23 @@ void ItompCIOTrajectory::fillInMinJerk(int trajectory_index,
 }
 
 void ItompCIOTrajectory::fillInMinJerkCartesianTrajectory(
-		const std::set<int>& groupJointsKDLIndices,
-		const Eigen::MatrixXd::RowXpr joint_vel_array,
-		const Eigen::MatrixXd::RowXpr joint_acc_array,
-		const moveit_msgs::Constraints& path_constraints,
-		const string& group_name)
+    const std::set<int>& groupJointsKDLIndices,
+    const Eigen::MatrixXd::RowXpr joint_vel_array,
+    const Eigen::MatrixXd::RowXpr joint_acc_array,
+    const moveit_msgs::Constraints& path_constraints,
+    const string& group_name)
 {
 	robot_state::RobotStatePtr kinematic_state(
-			new robot_state::RobotState(robot_model_->getRobotModel()));
+        new robot_state::RobotState(robot_model_->getRobotModel()));
 	const robot_state::JointModelGroup* joint_model_group =
-			robot_model_->getRobotModel()->getJointModelGroup(group_name);
+        robot_model_->getRobotModel()->getJointModelGroup(group_name);
 
 	geometry_msgs::Vector3 start_position =
-			path_constraints.position_constraints[0].target_point_offset;
+        path_constraints.position_constraints[0].target_point_offset;
 	geometry_msgs::Vector3 goal_position =
-			path_constraints.position_constraints[1].target_point_offset;
+        path_constraints.position_constraints[1].target_point_offset;
 	geometry_msgs::Quaternion orientation =
-			path_constraints.orientation_constraints[0].orientation;
+        path_constraints.orientation_constraints[0].orientation;
 
 	vel_start_ = joint_vel_array;
 	acc_start_ = joint_acc_array;
@@ -724,7 +702,7 @@ void ItompCIOTrajectory::fillInMinJerkCartesianTrajectory(
 
 		Eigen::Affine3d end_effector_state = Eigen::Affine3d::Identity();
 		Eigen::Quaternion<double> rot(orientation.w, orientation.x,
-				orientation.y, orientation.z);
+                                      orientation.y, orientation.z);
 		Eigen::Vector3d trans(position.x, position.y, position.z);
 		Eigen::Matrix3d mat = rot.toRotationMatrix();
 		end_effector_state.linear() = mat;
@@ -736,8 +714,8 @@ void ItompCIOTrajectory::fillInMinJerkCartesianTrajectory(
 		while (found_ik == false)
 		{
 			found_ik = kinematic_state->setFromIK(joint_model_group,
-					end_effector_state, 10, 0.1,
-					moveit::core::GroupStateValidityCallbackFn(), options);
+                                                  end_effector_state, 10, 0.1,
+                                                  moveit::core::GroupStateValidityCallbackFn(), options);
 			if (found_ik)
 			{
 				//ROS_INFO("IK solution found for waypoint %d", i);

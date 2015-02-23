@@ -388,8 +388,7 @@ void ItompPlannerNode::fillGroupJointTrajectory(const string& groupName,
 
 	const ItompPlanningGroup* group = robot_model_.getPlanningGroup(groupName);
 	int goal_index = trajectory_->getNumPoints() - 1;
-	Eigen::MatrixXd::RowXpr goalPoint = trajectory_->getTrajectoryPoint(
-                                            goal_index);
+    Eigen::MatrixXd::RowXpr goalPoint = trajectory_->getTrajectoryPoint(goal_index);
 	for (int i = 0; i < group->num_joints_; ++i)
 	{
 		string name = group->group_joints_[i].joint_name_;
@@ -409,12 +408,11 @@ void ItompPlannerNode::fillGroupJointTrajectory(const string& groupName,
 	trajectories_.resize(num_trajectories);
 	for (int i = 0; i < num_trajectories; ++i)
 	{
-		trajectories_[i].reset(
-            new ItompCIOTrajectory(&robot_model_,
-                                   trajectory_->getDuration(),
-                                   trajectory_->getDiscretization(),
-                                   PlanningParameters::getInstance()->getNumContacts(),
-                                   PlanningParameters::getInstance()->getPhaseDuration()));
+        trajectories_[i].reset(new ItompCIOTrajectory(&robot_model_,
+                               trajectory_->getDuration(),
+                               trajectory_->getDiscretization(),
+                               PlanningParameters::getInstance()->getNumContacts(),
+                               PlanningParameters::getInstance()->getPhaseDuration()));
 
 		*(trajectories_[i].get()) = *(trajectory_.get());
 
@@ -424,8 +422,6 @@ void ItompPlannerNode::fillGroupJointTrajectory(const string& groupName,
                                             precomputation_trajectory_constraints, start_point_velocities_.row(0),
                                             start_point_accelerations_.row(0));
 		}
-
-		// else !!!
 		else if (path_constraints.position_constraints.size() == 0)
 		{
 			trajectories_[i]->fillInMinJerk(groupJointsKDLIndices,
@@ -434,10 +430,9 @@ void ItompPlannerNode::fillGroupJointTrajectory(const string& groupName,
 		}
 		else
 		{
-			trajectories_[i]->fillInMinJerkCartesianTrajectory(
-                groupJointsKDLIndices, start_point_velocities_.row(0),
-                start_point_accelerations_.row(0), path_constraints,
-                groupName);
+            trajectories_[i]->fillInMinJerkCartesianTrajectory(groupJointsKDLIndices, start_point_velocities_.row(0),
+                    start_point_accelerations_.row(0), path_constraints,
+                    groupName);
 		}
 	}
 }
