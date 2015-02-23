@@ -1,11 +1,11 @@
 num_trials: 1
 planning_time_limit: 120.0
-max_iterations: 2000
+max_iterations: 0
 max_iterations_after_collision_free: 0
-num_trajectories: 4
+num_trajectories: 1
 
-precomputation_init_milestones: 1000
-precomputation_add_milestones: 1000
+precomputation_init_milestones: 0
+precomputation_add_milestones: 500
 precomputation_grow_milestones: 100
 precomputation_expand_milestones: 400
 precomputation_nn: 10

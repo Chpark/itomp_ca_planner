@@ -9,11 +9,14 @@
 #include <moveit/robot_model/robot_model.h>
 #include <itomp_ca_planner/visualization/visualization_manager.h>
 #include <itomp_ca_planner/util/planning_parameters.h>
+#include <omp.h>
+#include <boost/graph/connected_components.hpp>
 
 namespace itomp_ca_planner
 {
 
 const std::string END_EFFECTOR_NAME = "tcp_1_link";
+flann::SearchParams FLANN_PARAMS;
 
 Precomputation::Precomputation() :
     stateProperty_(boost::get(vertex_state_t(), g_)), totalConnectionAttemptsProperty_(
@@ -22,7 +25,8 @@ Precomputation::Precomputation() :
 				boost::get(boost::edge_weight, g_)), copiedWeightProperty_(
                     boost::get(edge_scaled_weight_t(), g_))
 {
-
+    FLANN_PARAMS.checks = 128;
+    FLANN_PARAMS.cores = 8;
 }
 
 Precomputation::~Precomputation()
@@ -37,6 +41,10 @@ void Precomputation::initialize(
 	planning_scene_ = planning_scene;
 	group_name_ = group_name;
 	robot_model_ = &robot_model;
+
+    size_t num_threads_ = omp_get_max_threads();
+    omp_set_num_threads(num_threads_);
+    ROS_INFO("Use %d threads on %d processors", num_threads_, omp_get_num_procs());
 }
 
 void Precomputation::growRoadmap(int new_milestones)
@@ -71,10 +79,8 @@ void Precomputation::growRoadmap(int new_milestones)
 	const int NN = PlanningParameters::getInstance()->getPrecomputationNn() + 1;
 
 	// find nearest neighbors
-	flann::Matrix<double> dataset(new double[milestones * dim], milestones,
-                                  dim);
-	flann::Matrix<double> query(new double[new_milestones * dim],
-                                new_milestones, dim);
+    flann::Matrix<double> dataset(new double[milestones * dim], milestones, dim);
+    flann::Matrix<double> query(new double[new_milestones * dim], new_milestones, dim);
 	flann::Matrix<int> indices(new int[query.rows * NN], query.rows, NN);
 	flann::Matrix<double> dists(new double[query.rows * NN], query.rows, NN);
 	{
@@ -87,17 +93,14 @@ void Precomputation::growRoadmap(int new_milestones)
 		double* query_ptr = query.ptr();
 		for (int i = 0; i < new_milestones; ++i)
 		{
-			memcpy(query_ptr,
-                   states_[old_milestones + i]->getVariablePositions(),
-                   sizeof(double) * dim);
+            memcpy(query_ptr, states_[old_milestones + i]->getVariablePositions(), sizeof(double) * dim);
 			query_ptr += dim;
 		}
 
 		// do a knn search, using flann libarary
-		flann::Index<flann::L2<double> > index(dataset,
-                                               flann::KDTreeIndexParams(4));
+        flann::Index<flann::L2<double> > index(dataset, flann::KDTreeIndexParams(4));
 		index.buildIndex();
-		index.knnSearch(query, indices, dists, NN, flann::SearchParams(128));
+        index.knnSearch(query, indices, dists, NN, FLANN_PARAMS);
 	}
 
 	// create graph
@@ -150,8 +153,7 @@ void Precomputation::growRoadmap(int new_milestones)
 			if (result)
 			{
 				const Graph::edge_property_type properties(weight);
-				boost::add_edge(graph_vertices[i], graph_vertices[index],
-                                properties, g_);
+                boost::add_edge(graph_vertices[i], graph_vertices[index], properties, g_);
 				successfulConnectionAttemptsProperty_[graph_vertices[i]]++;
 				successfulConnectionAttemptsProperty_[graph_vertices[index]]++;
 			}
@@ -168,11 +170,9 @@ void Precomputation::expandRoadmap(int new_milestones)
 
 	const int NN = PlanningParameters::getInstance()->getPrecomputationNn() + 1;
 
-	const robot_state::RobotState& current_state =
-        planning_scene_->getCurrentState();
+    const robot_state::RobotState& current_state = planning_scene_->getCurrentState();
 
-	const robot_state::JointModelGroup* joint_model_group =
-        current_state.getJointModelGroup(group_name_);
+    const robot_state::JointModelGroup* joint_model_group = current_state.getJointModelGroup(group_name_);
 
 	int dim = current_state.getVariableCount();
 
@@ -194,8 +194,7 @@ void Precomputation::expandRoadmap(int new_milestones)
 	// sample
 	for (int i = old_milestones; i < milestones; ++i)
 	{
-		robot_state::RobotState* state = new robot_state::RobotState(
-            current_state);
+        robot_state::RobotState* state = new robot_state::RobotState(current_state);
 
 		double r = (double) rand() / RAND_MAX * prob_acc;
 		std::map<double, Vertex>::iterator it = pdf.lower_bound(r);
@@ -204,13 +203,11 @@ void Precomputation::expandRoadmap(int new_milestones)
 		Vertex v = it->second;
 		const robot_state::RobotState* s = stateProperty_[v];
 
-		const double LONGEST_VALID_SEGMENT_LENGTH =
-            PlanningParameters::getInstance()->getPrecomputationMaxValidSegmentDist();
+        const double LONGEST_VALID_SEGMENT_LENGTH = PlanningParameters::getInstance()->getPrecomputationMaxValidSegmentDist();
 		while (true)
 		{
 
-			state->setToRandomPositionsNearBy(joint_model_group, *s,
-                                              LONGEST_VALID_SEGMENT_LENGTH * 0.5);
+            state->setToRandomPositionsNearBy(joint_model_group, *s, LONGEST_VALID_SEGMENT_LENGTH * 0.5);
 			state->updateCollisionBodyTransforms();
 
 			if (planning_scene_->isStateValid(*state))
@@ -222,18 +219,15 @@ void Precomputation::expandRoadmap(int new_milestones)
 	}
 
 	// find nearest neighbors
-	flann::Matrix<double> dataset(new double[milestones * dim], milestones,
-                                  dim);
-	flann::Matrix<double> query(new double[new_milestones * dim],
-                                new_milestones, dim);
+    flann::Matrix<double> dataset(new double[milestones * dim], milestones, dim);
+    flann::Matrix<double> query(new double[new_milestones * dim], new_milestones, dim);
 	flann::Matrix<int> indices(new int[query.rows * NN], query.rows, NN);
 	flann::Matrix<double> dists(new double[query.rows * NN], query.rows, NN);
 	{
 		double* data_ptr = dataset.ptr();
 		for (int i = 0; i < milestones; ++i)
 		{
-			memcpy(data_ptr, states_[i]->getVariablePositions(),
-                   sizeof(double) * dim);
+            memcpy(data_ptr, states_[i]->getVariablePositions(), sizeof(double) * dim);
 			data_ptr += dim;
 		}
 		double* query_ptr = query.ptr();
@@ -246,10 +240,9 @@ void Precomputation::expandRoadmap(int new_milestones)
 		}
 
 		// do a knn search, using flann libarary
-		flann::Index<flann::L2<double> > index(dataset,
-                                               flann::KDTreeIndexParams(4));
+        flann::Index<flann::L2<double> > index(dataset, flann::KDTreeIndexParams(4));
 		index.buildIndex();
-		index.knnSearch(query, indices, dists, NN, flann::SearchParams(128));
+        index.knnSearch(query, indices, dists, NN, FLANN_PARAMS);
 	}
 
 	// create graph
@@ -326,13 +319,27 @@ void Precomputation::createRoadmap(int milestones)
 	ROS_INFO("Create %d milestones", milestones);
 	while (states_.size() < milestones)
 	{
-		growRoadmap(
-            PlanningParameters::getInstance()->getPrecomputationGrowMilestones());
+        growRoadmap(
+          PlanningParameters::getInstance()->getPrecomputationGrowMilestones());
 		expandRoadmap(
             PlanningParameters::getInstance()->getPrecomputationExpandMilestones());
 
 		renderPRMGraph();
+
+        ROS_INFO("# of milestones : %d", states_.size());
 	}
+
+    std::vector<int> component(num_vertices(g_));
+    int num = connected_components(g_, &component[0]);
+
+    std::vector<int>::size_type i;
+    std::cout << "Total number of components: " << num << std::endl;
+    for (i = 0; i != component.size(); ++i)
+    {
+        if (component[i] == 0)
+            std::cout << "Vertex " << i <<" is in component " << component[i] << std::endl;
+    }
+    std::cout << std::endl;
 }
 
 bool Precomputation::localPlanning(const robot_state::RobotState& from,
@@ -346,36 +353,54 @@ bool Precomputation::localPlanning(const robot_state::RobotState& from,
 
 	/* initialize the queue of test positions */
 	std::queue<std::pair<int, int> > pos;
-	if (nd >= 2)
-	{
-		pos.push(std::make_pair(1, nd - 1));
 
-		/* temporary storage for the checked state */
-		robot_state::RobotState test(from);
+    if (nd >= 2)
+    {
+        pos.push(std::make_pair(1, nd - 1));
 
-		/* repeatedly subdivide the path segment in the middle (and check the middle) */
-		while (!pos.empty())
-		{
-			std::pair<int, int> x = pos.front();
+        int num_threads_ = omp_get_max_threads();
+        std::vector<robot_state::RobotState> test(num_threads_, robot_state::RobotState(from));
 
-			int mid = (x.first + x.second) / 2;
-			from.interpolate(to, (double) mid / (double) nd, test);
-			test.updateCollisionBodyTransforms();
+        std::vector<int> evaluation_index(num_threads_);
+        while (!pos.empty())
+        {
+            int i = 0;
+            for ( ; i < num_threads_; ++i)
+            {
+                if (pos.empty())
+                    break;
 
-			if (!planning_scene_->isStateValid(test))
-			{
-				result = false;
-				break;
-			}
+                std::pair<int, int> x = pos.front();
 
-			pos.pop();
+                int mid = (x.first + x.second) / 2;
 
-			if (x.first < mid)
-				pos.push(std::make_pair(x.first, mid - 1));
-			if (x.second > mid)
-				pos.push(std::make_pair(mid + 1, x.second));
-		}
-	}
+                evaluation_index[i] = mid;
+
+                pos.pop();
+
+                if (x.first < mid)
+                    pos.push(std::make_pair(x.first, mid - 1));
+                if (x.second > mid)
+                    pos.push(std::make_pair(mid + 1, x.second));
+            }
+            int num_evaluations = i;
+
+            #pragma omp parallel for
+            for (int i = 0; i < num_evaluations; ++i)
+            {
+                int mid = evaluation_index[i];
+                from.interpolate(to, (double) mid / (double) nd, test[i]);
+                test[i].updateCollisionBodyTransforms();
+
+                if (!planning_scene_->isStateValid(test[i]))
+                {
+                    result = false;
+                }
+            }
+            if (!result)
+                break;
+        }
+    }
 
 	return result;
 }
@@ -391,8 +416,7 @@ void Precomputation::addStartState(const robot_state::RobotState& from)
 	states_[milestones - 1] = new robot_state::RobotState(from);
 
 	// find nearest neighbors
-	flann::Matrix<double> dataset(new double[milestones * dim], milestones,
-                                  dim);
+    flann::Matrix<double> dataset(new double[milestones * dim], milestones, dim);
 	const flann::Matrix<double> query(new double[1 * dim], 1, dim);
 	flann::Matrix<int> indices(new int[query.rows * NN], query.rows, NN);
 	flann::Matrix<double> dists(new double[query.rows * NN], query.rows, NN);
@@ -400,18 +424,16 @@ void Precomputation::addStartState(const robot_state::RobotState& from)
 		double* data_ptr = dataset.ptr();
 		for (int i = 0; i < milestones; ++i)
 		{
-			memcpy(data_ptr, states_[i]->getVariablePositions(),
-                   sizeof(double) * dim);
+            memcpy(data_ptr, states_[i]->getVariablePositions(), sizeof(double) * dim);
 			data_ptr += dim;
 		}
 
 		memcpy(query.ptr(), from.getVariablePositions(), sizeof(double) * dim);
 
 		// do a knn search, using flann libarary
-		flann::Index<flann::L2<double> > index(dataset,
-                                               flann::KDTreeIndexParams(4));
+        flann::Index<flann::L2<double> > index(dataset, flann::KDTreeIndexParams(4));
 		index.buildIndex();
-		index.knnSearch(query, indices, dists, NN, flann::SearchParams(128));
+        index.knnSearch(query, indices, dists, NN, FLANN_PARAMS);
 	}
 
 	// add to graph
@@ -447,9 +469,15 @@ void Precomputation::addStartState(const robot_state::RobotState& from)
 			if (result)
 			{
 				const Graph::edge_property_type properties(weight);
-				boost::add_edge(graph_vertices[i], graph_vertices[index],
-                                properties, g_);
+                boost::add_edge(graph_vertices[i], graph_vertices[index], properties, g_);
 			}
+
+            printf("Start NN %d (%f) : ", j, weight);
+            for (int k = 0; k < dim; ++k)
+            {
+                printf("%f ", states_[index]->getVariablePositions()[k]);
+            }
+            printf("\n");
 		}
 	}
 
@@ -501,7 +529,7 @@ void Precomputation::addGoalStates(
 		flann::Index<flann::L2<double> > index(dataset,
                                                flann::KDTreeIndexParams(4));
 		index.buildIndex();
-		index.knnSearch(query, indices, dists, NN, flann::SearchParams(128));
+        index.knnSearch(query, indices, dists, NN, FLANN_PARAMS);
 	}
 
 	// add to graph
@@ -609,7 +637,7 @@ bool Precomputation::extractPaths(int num_paths)
 				paths_.clear();
 			}
 
-            path = smoothPath(path);
+            //path = smoothPath(path);
 
 			paths_.push_back(
                 std::make_pair<std::vector<const robot_state::RobotState*>,
@@ -661,7 +689,15 @@ std::vector<const robot_state::RobotState*> Precomputation::smoothPath(const std
         i = j - 1;
     }
 
-    ROS_INFO("Path smoothing : %d -> %d", path.size(), new_path.size());
+    printf("Path smoothing : %d -> %d\n", path.size(), new_path.size());
+    for (int i = 0; i < new_path.size(); ++i)
+    {
+        printf("%d :", i);
+        const robot_state::RobotState* state = new_path[i];
+        for (int j = 0; j < state->getVariableCount(); ++j)
+            printf("%f ", state->getVariablePositions()[j]);
+        printf("\n");
+    }
 
     return new_path;
 }
@@ -719,10 +755,15 @@ void Precomputation::renderPaths()
 
 	visualization_msgs::MarkerArray ma;
 	visualization_msgs::Marker::_color_type RED;
+    visualization_msgs::Marker::_color_type BLUE;
 	RED.a = 1.0;
 	RED.r = 1.0;
 	RED.g = 0.0;
 	RED.b = 0.0;
+    BLUE.a = 1.0;
+    BLUE.r = 0.0;
+    BLUE.g = 0.0;
+    BLUE.b = 1.0;
 
 	visualization_msgs::Marker msg;
 	msg.header.frame_id = robot_model_->getRobotModel()->getModelFrame();
@@ -765,10 +806,51 @@ void Precomputation::renderPaths()
 				point.y = transform.translation()(1);
 				point.z = transform.translation()(2);
 				msg.points.push_back(point);
+
+                k = nd;
 			}
+
+            const Eigen::Affine3d& transform = to->getGlobalLinkTransform(
+                                                   "tcp_1_link");
+
+            point.x = transform.translation()(0);
+            point.y = transform.translation()(1);
+            point.z = transform.translation()(2);
+            msg.points.push_back(point);
+
 		}
+        msg.color = BLUE;
 		ma.markers.push_back(msg);
 		++msg.id;
+
+        //
+
+        msg.points.resize(0);
+        for (int i = 0; i < paths_[j].first.size() - 1; ++i)
+        {
+            const robot_state::RobotState* from = paths_[j].first[i];
+            const robot_state::RobotState* to = paths_[j].first[i + 1];
+            double dist = distance(from, to);
+            int nd = ceil(dist / LONGEST_VALID_SEGMENT_LENGTH);
+
+            for (int k = 0; k <= nd; ++k)
+            {
+                robot_state::RobotState test(*from);
+                from->interpolate(*to, (double) k / (double) nd, test);
+                test.updateLinkTransforms();
+
+                const Eigen::Affine3d& transform = test.getGlobalLinkTransform(
+                                                       "tcp_1_link");
+
+                point.x = transform.translation()(0);
+                point.y = transform.translation()(1);
+                point.z = transform.translation()(2);
+                msg.points.push_back(point);
+            }
+        }
+        msg.color = RED;
+        ma.markers.push_back(msg);
+        ++msg.id;
 	}
 
 	VisualizationManager::getInstance()->getVisualizationMarkerArrayPublisher().publish(
@@ -791,7 +873,7 @@ void Precomputation::renderPRMGraph()
 	BLUE.g = 1.0;
 	BLUE.b = 1.0;
 	LIGHT_YELLOW = BLUE;
-	LIGHT_YELLOW.b = 0.5;
+    LIGHT_YELLOW.b = 0.0;
 	GREEN.a = 0.1;
 	GREEN.r = 0.5;
 	GREEN.b = 0.5;
@@ -816,18 +898,24 @@ void Precomputation::renderPRMGraph()
 
 	BOOST_FOREACH (Vertex v, boost::vertices(g_))
 	{
+        msg.points.resize(0);
+
 		const Eigen::Affine3d& transform =
             stateProperty_[v]->getGlobalLinkTransform("tcp_1_link");
 		point.x = transform.translation()(0);
 		point.y = transform.translation()(1);
 		point.z = transform.translation()(2);
 
-		//if (v == 500 || v == 501)
-		msg.points.push_back(point);
-	}
-	ma.markers.push_back(msg);
+        msg.color.g = 1.0 * successfulConnectionAttemptsProperty_[v] / totalConnectionAttemptsProperty_[v];
 
-	msg.id = 1;
+		msg.points.push_back(point);
+
+        ma.markers.push_back(msg);
+        ++msg.id;
+	}
+    //ma.markers.push_back(msg);
+
+    ++msg.id;
 	msg.points.resize(0);
 	msg.type = visualization_msgs::Marker::LINE_LIST;
 	msg.scale.x = scale2;
@@ -839,9 +927,6 @@ void Precomputation::renderPRMGraph()
 	{
 		const Vertex u = boost::source(e, g_);
 		const Vertex v = boost::target(e, g_);
-
-		//if (!(u == 500 || u == 501 || v == 500 || v == 501))
-		//continue;
 
 		const Eigen::Affine3d& transform =
             stateProperty_[u]->getGlobalLinkTransform("tcp_1_link");
@@ -859,17 +944,15 @@ void Precomputation::renderPRMGraph()
 		msg.points.push_back(point);
 	}
 
-	ma.markers.push_back(msg);
+    ma.markers.push_back(msg);
 
-	VisualizationManager::getInstance()->getVisualizationMarkerArrayPublisher().publish(
-        ma);
+    VisualizationManager::getInstance()->getVisualizationMarkerArrayPublisher().publish(ma);
 
 	ros::WallDuration sleep_time(0.01);
 	sleep_time.sleep();
 }
 
-void Precomputation::extractInitialTrajectories(
-    moveit_msgs::TrajectoryConstraints& trajectory_constraints)
+void Precomputation::extractInitialTrajectories(moveit_msgs::TrajectoryConstraints& trajectory_constraints)
 {
 	int num_trajectories =
         PlanningParameters::getInstance()->getNumTrajectories();

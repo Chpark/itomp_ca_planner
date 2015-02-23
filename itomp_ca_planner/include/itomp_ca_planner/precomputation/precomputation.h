@@ -33,7 +33,7 @@ class astar_goal_visitor: public boost::default_astar_visitor
 {
 public:
 	astar_goal_visitor(Vertex goal) :
-			m_goal(goal)
+                m_goal(goal)
 	{
 	}
 	template<class Graph>
@@ -47,8 +47,8 @@ private:
 };
 
 inline bool pathCompare(
-		const std::pair<std::vector<const robot_state::RobotState*>, double>& p1,
-		const std::pair<std::vector<const robot_state::RobotState*>, double>& p2)
+        const std::pair<std::vector<const robot_state::RobotState*>, double>& p1,
+        const std::pair<std::vector<const robot_state::RobotState*>, double>& p2)
 {
 	return p1.second < p2.second;
 }
@@ -77,24 +77,23 @@ public:
 	};
 	typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS,
 			boost::property<vertex_state_t, const robot_state::RobotState*,
-					boost::property<vertex_total_connection_attempts_t,
-							unsigned int,
-							boost::property<
-									vertex_successful_connection_attempts_t,
-									unsigned int> > >,
+                        boost::property<vertex_total_connection_attempts_t,
+                        unsigned int,
+                        boost::property<
+                        vertex_successful_connection_attempts_t,
+                        unsigned int> > >,
 			boost::property<boost::edge_weight_t, double,
-					boost::property<edge_scaled_weight_t, double> > > Graph;
+                        boost::property<edge_scaled_weight_t, double> > > Graph;
 	typedef boost::graph_traits<Graph>::vertex_descriptor Vertex;
 	typedef boost::graph_traits<Graph>::edge_descriptor Edge;
 
 	void initialize(const planning_scene::PlanningSceneConstPtr& planning_scene,
-			const ItompRobotModel& robot_model, const std::string& group_name);
+                                        const ItompRobotModel& robot_model, const std::string& group_name);
 	void createRoadmap();
 	void createRoadmap(int milestones);
 	void addStartState(const robot_state::RobotState& from);
 	void addGoalStates(const std::vector<robot_state::RobotState>& to);
-	bool localPlanning(const robot_state::RobotState& from,
-			const robot_state::RobotState& to, double distance);
+        bool localPlanning(const robot_state::RobotState& from, const robot_state::RobotState& to, double distance) const;
 	bool extractPaths(int num_paths);
 
 	void growRoadmap(int new_milestones);
@@ -109,8 +108,13 @@ public:
 
 protected:
 	double costHeuristic(Vertex u, Vertex v) const;
+        double costWorkspace(Vertex u, Vertex v) const;
 	double distance(const robot_state::RobotState* s1,
-			const robot_state::RobotState* s2) const;
+                                        const robot_state::RobotState* s2) const;
+        double workspaceDistance(const robot_state::RobotState* s1,
+                                                         const robot_state::RobotState* s2) const;
+
+        std::vector<const robot_state::RobotState*> smoothPath(const std::vector<const robot_state::RobotState*>& path) const;
 
 	planning_scene::PlanningSceneConstPtr planning_scene_;
 	std::string group_name_;

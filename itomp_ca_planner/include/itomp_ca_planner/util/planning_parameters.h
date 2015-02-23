@@ -105,7 +105,7 @@ public:
 	int getPrecomputationGrowMilestones();
 	int getPrecomputationExpandMilestones();
 	int getPrecomputationNn();
-	double getPrecomputationMaxValidSegmentDist();
+        double getPrecomputationMaxValidSegmentDist() const;
 	bool getDrawPrecomputation();
 
 private:
@@ -419,7 +419,7 @@ inline int PlanningParameters::getPrecomputationNn()
 {
 	return precomputation_nn_;
 }
-inline double PlanningParameters::getPrecomputationMaxValidSegmentDist()
+inline double PlanningParameters::getPrecomputationMaxValidSegmentDist() const
 {
 	return precomputation_max_valid_segment_dist_;
 }
