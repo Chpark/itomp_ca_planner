@@ -25,7 +25,7 @@
   <rosparam command="load" file="$(find lbr3_moveit_generated)/config/kinematics.yaml" ns="move_itomp"/>
 <!--  <param name="/move_itomp/planning_plugin" value="itomp_ca_planner/ItompPlanner"/>-->
   <param name="/move_itomp/planning_plugin" value="ompl_interface/OMPLPlanner"/>
-  <rosparam command="load" file="$(find lbr3_moveit_generated)/config/ompl_planning.yaml" />
+  <rosparam command="load" file="$(find lbr3_moveit_generated)/config/ompl_planning.yaml" ns="move_itomp" />
 
 <!--
   <node name="move_itomp" pkg="move_itomp" type="move_itomp" respawn="false" output="screen">
