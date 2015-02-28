@@ -34,14 +34,14 @@ void VisualizationManager::render()
 void VisualizationManager::renderEnvironment()
 {
 	string environment_file =
-			PlanningParameters::getInstance()->getEnvironmentModel();
+        PlanningParameters::getInstance()->getEnvironmentModel();
 	if (environment_file.empty())
 		return;
 
 	vector<double> environment_position =
-			PlanningParameters::getInstance()->getEnvironmentModelPosition();
+        PlanningParameters::getInstance()->getEnvironmentModelPosition();
 	double scale =
-			PlanningParameters::getInstance()->getEnvironmentModelScale();
+        PlanningParameters::getInstance()->getEnvironmentModelScale();
 	environment_position.resize(3, 0);
 
 	visualization_msgs::MarkerArray ma;
@@ -543,14 +543,14 @@ void VisualizationManager::renderGround()
 }
 
 void VisualizationManager::initialize(
-		const itomp_ca_planner::ItompRobotModel& robot_model)
+    const itomp_ca_planner::ItompRobotModel& robot_model)
 {
 	ros::NodeHandle node_handle;
 	vis_marker_array_publisher_ = node_handle.advertise<
-			visualization_msgs::MarkerArray>(
-			"pomp_planner/visualization_marker_array", 10);
+                                  visualization_msgs::MarkerArray>(
+                                      "pomp_planner/visualization_marker_array", 10);
 	vis_marker_publisher_ = node_handle.advertise<visualization_msgs::Marker>(
-			"pomp_planner/visualization_marker", 10);
+                                "pomp_planner/visualization_marker", 10);
 
 	reference_frame_ = robot_model.getReferenceFrame();
 
@@ -560,15 +560,15 @@ void VisualizationManager::initialize(
 	robot_states_.resize(num_traj);
 	for (int i = 0; i < num_traj; ++i)
 		robot_states_[i].reset(
-				new robot_state::RobotState(robot_model_->getRobotModel()));
+            new robot_state::RobotState(robot_model_->getRobotModel()));
 }
 
 void VisualizationManager::setPlanningGroup(
-		const itomp_ca_planner::ItompRobotModel& robot_model,
-		const std::string& groupName)
+    const itomp_ca_planner::ItompRobotModel& robot_model,
+    const std::string& groupName)
 {
 	const multimap<string, string>& endeffectorSegments =
-			PlanningParameters::getInstance()->getAnimateEndeffectorSegment();
+        PlanningParameters::getInstance()->getAnimateEndeffectorSegment();
 
 	multimap<string, string>::const_iterator it;
 	for (it = endeffectorSegments.begin(); it != endeffectorSegments.end();
@@ -577,12 +577,12 @@ void VisualizationManager::setPlanningGroup(
 		if (it->first == groupName)
 		{
 			int segmentIndex =
-					robot_model.getForwardKinematicsSolver()->segmentNameToIndex(
-							it->second);
+                robot_model.getForwardKinematicsSolver()->segmentNameToIndex(
+                    it->second);
 			if (segmentIndex == -1)
 			{
 				ROS_INFO(
-						"Invalid endeffector segment name %s for %s", it->second.c_str(), it->first.c_str());
+                    "Invalid endeffector segment name %s for %s", it->second.c_str(), it->first.c_str());
 			}
 			else
 			{
@@ -592,12 +592,11 @@ void VisualizationManager::setPlanningGroup(
 	}
 
 	root_segment_number_ =
-			robot_model.getForwardKinematicsSolver()->segmentNameToIndex(
-					PlanningParameters::getInstance()->getLowerBodyRoot());
+        robot_model.getForwardKinematicsSolver()->segmentNameToIndex(
+            PlanningParameters::getInstance()->getLowerBodyRoot());
 }
 
-void VisualizationManager::animateEndeffector(int trajectory_index,
-		int point_start, int point_end,
+void VisualizationManager::animateEndeffector(int trajectory_index, int point_start, int point_end,
 		const vector<vector<KDL::Frame> >& segmentFrames, bool best)
 {
 	const double trajectory_color_diff = 0.33;
@@ -633,14 +632,12 @@ void VisualizationManager::animateEndeffector(int trajectory_index,
 
 	msg.points.resize(0);
 
-	for (unsigned int index = 0;
-			index < animate_endeffector_segment_numbers_.size(); ++index)
+    for (unsigned int index = 0; index < animate_endeffector_segment_numbers_.size(); ++index)
 	{
 		if (index != 0)
 			break;
 
-		msg.id = (best ? 0 : trajectory_index) * animate_endeffector_segment_numbers_.size()
-				+ index;
+        msg.id = (best ? 0 : trajectory_index) * animate_endeffector_segment_numbers_.size() + index;
 
 		msg.color = best ? (index == 0 ? YELLOW : LIGHT_YELLOW) : (index == 0 ? RED : LIGHT_RED);
 
@@ -664,7 +661,7 @@ void VisualizationManager::animateEndeffector(int trajectory_index,
 }
 
 void VisualizationManager::animateRoot(int numFreeVars, int freeVarStartIndex,
-		const std::vector<std::vector<KDL::Frame> >& segmentFrames, bool best)
+                                       const std::vector<std::vector<KDL::Frame> >& segmentFrames, bool best)
 {
 	const double scale = 0.05;
 
@@ -721,7 +718,7 @@ void VisualizationManager::animateRoot(int numFreeVars, int freeVarStartIndex,
 }
 
 void VisualizationManager::animateCoM(int numFreeVars, int freeVarStartIndex,
-		const std::vector<KDL::Vector>& CoM, bool best)
+                                      const std::vector<KDL::Vector>& CoM, bool best)
 {
 	const double scale = 0.05;
 
@@ -778,7 +775,7 @@ void VisualizationManager::animateCoM(int numFreeVars, int freeVarStartIndex,
 			diff.y = point.y - prevPt.y;
 			diff.z = point.z - prevPt.z;
 			double dist = sqrt(
-					diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
+                              diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
 			int numNeeded = (int) (dist / scale * 2);
 			for (int k = 0; k < numNeeded; ++k)
 			{
@@ -795,13 +792,12 @@ void VisualizationManager::animateCoM(int numFreeVars, int freeVarStartIndex,
 }
 
 void VisualizationManager::animatePath(int trajectory_index,
-		const ItompCIOTrajectory* traj, bool is_best, const std::string& group_name)
+                                       const ItompCIOTrajectory* traj, bool is_best, const std::string& group_name)
 {
 	if (!is_best)
 		return;
 
-	std::vector<std::string> link_names =
-			robot_model_->getRobotModel()->getJointModelGroup(group_name)->getLinkModelNames();
+    std::vector<std::string> link_names = robot_model_->getRobotModel()->getJointModelGroup(group_name)->getLinkModelNames();
 
 	std_msgs::ColorRGBA WHITE, YELLOW, RED;
 	WHITE.a = 1.0;
@@ -826,10 +822,8 @@ void VisualizationManager::animatePath(int trajectory_index,
 		robot_states_[trajectory_index]->setVariablePositions(mat.data());
 		robot_states_[trajectory_index]->updateLinkTransforms();
 		std::string ns = "wp_" + boost::lexical_cast<std::string>(point);
-		robot_states_[trajectory_index]->getRobotMarkers(ma_point, link_names,
-				WHITE, ns, dur);
-		ma.markers.insert(ma.markers.end(), ma_point.markers.begin(),
-				ma_point.markers.end());
+        robot_states_[trajectory_index]->getRobotMarkers(ma_point, link_names, WHITE, ns, dur);
+        ma.markers.insert(ma.markers.end(), ma_point.markers.begin(), ma_point.markers.end());
 	}
 	int marker_size = ma.markers.size();
 
