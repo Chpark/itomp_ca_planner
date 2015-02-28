@@ -19,10 +19,12 @@
 #include <fstream>
 #include <boost/lexical_cast.hpp>
 #include <sched.h>
+#include <limits>
 
 using namespace std;
 
 const int M = 8;
+static int PLANNER_INDEX = -1;
 
 namespace move_kuka
 {
@@ -37,7 +39,7 @@ MoveKukaTest::~MoveKukaTest()
 {
 }
 
-void MoveKukaTest::run(const std::string& group_name, bool use_itomp)
+void MoveKukaTest::run(const std::string& group_name)
 {
 	// scene initialization
 
@@ -131,9 +133,21 @@ void MoveKukaTest::run(const std::string& group_name, bool use_itomp)
         planning_scene_->getCurrentStateNonConst();
 	std::vector<robot_state::RobotState> goal_states;
     goal_states.resize(100, planning_scene_->getCurrentStateNonConst());
+
+    // OMPL RRT makes jerky motion
+    start_state.getVariablePositions()[0] = -2.425220317795919;
+    start_state.getVariablePositions()[1] = 0.989476608237034;
+    start_state.getVariablePositions()[2] = 2.936041322472815;
+    start_state.getVariablePositions()[3] = -1.919432622233842;
+    start_state.getVariablePositions()[4] = -0.939591601191052;
+    start_state.getVariablePositions()[5] = 0.763634781820519;
+    start_state.getVariablePositions()[6] = -0.998423896960790;
+    start_state.update(true);
+
 	initStartGoalStates(start_state, goal_states);
 
 	// trajectory optimization using ITOMP
+    bool use_itomp = (planner_plugin_name.find("Itomp") != string::npos);
     plan(req, res, start_state, goal_states, use_itomp);
 	res.getMessage(response);
 
@@ -141,6 +155,19 @@ void MoveKukaTest::run(const std::string& group_name, bool use_itomp)
 	display_trajectory.trajectory_start = response.trajectory_start;
 	display_trajectory.trajectory.push_back(response.trajectory);
 	display_publisher_.publish(display_trajectory);
+
+    // print trajectory
+    std::stringstream ss;
+    ss.precision(std::numeric_limits<double>::digits10);
+    for (unsigned int i = 0; i < response.trajectory.joint_trajectory.points.size(); ++i)
+    {
+        const trajectory_msgs::JointTrajectoryPoint& point = response.trajectory.joint_trajectory.points[i];
+        std::cout << i << " : " << point.time_from_start.toSec() << " : ";
+        for (unsigned int j = 0; j < point.positions.size(); ++j)
+            std::cout << std::fixed << point.positions[j] << " ";
+        std::cout << endl;
+    }
+    ROS_INFO(ss.str().c_str());
 
 	// clean up
 	itomp_planner_instance_.reset();
@@ -233,10 +260,10 @@ void MoveKukaTest::plan(planning_interface::MotionPlanRequest& req,
                         std::vector<robot_state::RobotState>& goal_states,
                         bool use_itomp)
 {
-	const robot_state::JointModelGroup* joint_model_group =
-        start_state.getJointModelGroup(group_name_);
+    const robot_state::JointModelGroup* joint_model_group = start_state.getJointModelGroup(group_name_);
 	req.group_name = group_name_;
-	req.allowed_planning_time = 3000.0;
+    req.allowed_planning_time = 300.0;
+    req.num_planning_attempts = 1;
 
 	// Copy from start_state to req.start_state
 	unsigned int num_joints = start_state.getVariableCount();
@@ -247,9 +274,7 @@ void MoveKukaTest::plan(planning_interface::MotionPlanRequest& req,
 	memcpy(&req.start_state.joint_state.position[0],
            start_state.getVariablePositions(), sizeof(double) * num_joints);
 	if (start_state.hasVelocities())
-		memcpy(&req.start_state.joint_state.velocity[0],
-               start_state.getVariableVelocities(),
-               sizeof(double) * num_joints);
+        memcpy(&req.start_state.joint_state.velocity[0], start_state.getVariableVelocities(), sizeof(double) * num_joints);
 	else
 		memset(&req.start_state.joint_state.velocity[0], 0,
                sizeof(double) * num_joints);
@@ -264,6 +289,7 @@ void MoveKukaTest::plan(planning_interface::MotionPlanRequest& req,
 	// goal state
 	req.goal_constraints.clear();
 
+    /*
     if (use_itomp)
     {
         for (int i = 0; i < goal_states.size(); ++i)
@@ -275,6 +301,7 @@ void MoveKukaTest::plan(planning_interface::MotionPlanRequest& req,
         }
     }
     else
+    */
     {
         geometry_msgs::PoseStamped pose;
         pose.header.frame_id = "segment_0";
@@ -286,9 +313,14 @@ void MoveKukaTest::plan(planning_interface::MotionPlanRequest& req,
         std::vector<double> tolerance_angle(3, 0.01);
         moveit_msgs::Constraints pose_goal = kinematic_constraints::constructGoalConstraints("end_effector_link", pose, tolerance_pose, tolerance_angle);
         req.goal_constraints.push_back(pose_goal);
-
-        req.planner_id = "PRMkConfigDefault";
     }
+
+    std::stringstream ss;
+    ss << "Start state : ";
+    ss.precision(std::numeric_limits<double>::digits10);
+    for (int i = 0; i < start_state.getVariableCount(); ++i)
+        ss << std::fixed << start_state.getVariablePositions()[i] << " ";
+    ROS_INFO(ss.str().c_str());
 
     req.workspace_parameters.min_corner.x = -1.0;
     req.workspace_parameters.min_corner.y = -1.25;
@@ -314,23 +346,17 @@ void MoveKukaTest::plan(planning_interface::MotionPlanRequest& req,
     ROS_INFO("Available planners :");
     std::vector<std::string> algorithms;
     itomp_planner_instance_->getPlanningAlgorithms(algorithms);
-    for (int i = 0; i < algorithms.size(); ++i)
-        ROS_INFO("%s", algorithms[i].c_str());
+    for (unsigned int i = 0; i < algorithms.size(); ++i)
+    {
+        if (algorithms[i].find(group_name_) != std::string::npos)
+            ROS_INFO("%d : %s", i, algorithms[i].c_str());
+    }
 
-    /*
-    planning_interface::PlannerConfigurationMap pcm;
-    planning_interface::PlannerConfigurationSettings pcs;
-    pcs.group = "lower_body";
-    pcs.name = "PRMkConfigDefault";
-    pcm.insert(std::make_pair("lower_body", pcs));
-    itomp_planner_instance_->setPlannerConfigurations(pcm);
-    const planning_interface::PlannerConfigurationMap& pcm = itomp_planner_instance_->getPlannerConfigurations();
-    */
-
+    if (PLANNER_INDEX != -1)
+        req.planner_id = algorithms[PLANNER_INDEX];
 
 	planning_interface::PlanningContextPtr context =
-        itomp_planner_instance_->getPlanningContext(planning_scene_, req,
-                res.error_code_);
+        itomp_planner_instance_->getPlanningContext(planning_scene_, req, res.error_code_);
 
 
 	context->solve(res);
@@ -638,13 +664,14 @@ int main(int argc, char **argv)
 	spinner.start();
 	ros::NodeHandle node_handle("~");
 
-    bool use_itomp = true;
     if (argc > 1)
-        use_itomp = (boost::lexical_cast<int>(argv[1]) == 0);
+    {
+        PLANNER_INDEX = boost::lexical_cast<int>(argv[1]);
+    }
 
 	move_kuka::MoveKukaTest* move_kuka = new move_kuka::MoveKukaTest(
         node_handle);
-    move_kuka->run("lower_body", use_itomp);
+    move_kuka->run("lower_body");
 	delete move_kuka;
 
 	return 0;

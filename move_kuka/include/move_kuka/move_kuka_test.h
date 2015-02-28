@@ -19,7 +19,7 @@ public:
 	MoveKukaTest(const ros::NodeHandle& node_handle);
 	~MoveKukaTest();
 
-        void run(const std::string& group_name, bool use_itomp);
+        void run(const std::string& group_name);
 
 protected:
 	void loadStaticScene();
