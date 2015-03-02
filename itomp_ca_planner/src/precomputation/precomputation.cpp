@@ -329,6 +329,7 @@ void Precomputation::createRoadmap(int milestones)
         ROS_INFO("# of milestones : %d", states_.size());
 	}
 
+    /*
     std::vector<int> component(num_vertices(g_));
     int num = connected_components(g_, &component[0]);
 
@@ -340,6 +341,7 @@ void Precomputation::createRoadmap(int milestones)
             std::cout << "Vertex " << i <<" is in component " << component[i] << std::endl;
     }
     std::cout << std::endl;
+    */
 }
 
 bool Precomputation::localPlanning(const robot_state::RobotState& from,
@@ -637,7 +639,7 @@ bool Precomputation::extractPaths(int num_paths)
 				paths_.clear();
 			}
 
-            //path = smoothPath(path);
+            path = smoothPath(path);
 
 			paths_.push_back(
                 std::make_pair<std::vector<const robot_state::RobotState*>,
@@ -688,6 +690,8 @@ std::vector<const robot_state::RobotState*> Precomputation::smoothPath(const std
         }
         i = j - 1;
     }
+
+    new_path = path;
 
     printf("Path smoothing : %d -> %d\n", path.size(), new_path.size());
     for (int i = 0; i < new_path.size(); ++i)

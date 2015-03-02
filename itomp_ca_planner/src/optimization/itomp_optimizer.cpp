@@ -75,12 +75,19 @@ bool ItompOptimizer::optimize()
 	{
 		while (iteration_ < num_iterations)
 		{
-			if (best_cost_manager_->isSolutionFound())
+            /*
+            if (best_cost_manager_->isSolutionFound())
 			{
                 break;
 			}
+            */
 
+            double start = ros::Time::now().toSec();
 			improvement_manager_->runSingleIteration(iteration_);
+            double elapsed = ros::Time::now().toSec() - start;
+            ROS_INFO("Iteration time : %f", elapsed);
+
+
 			is_feasible = evaluation_manager_.isLastTrajectoryFeasible();
             bool is_updated = updateBestTrajectory(evaluation_manager_.getTrajectoryCost(true));
 

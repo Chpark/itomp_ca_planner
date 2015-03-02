@@ -95,6 +95,8 @@ double EvaluationManager::evaluate()
 {
     INIT_TIME_MEASUREMENT(10)
 
+    ADD_TIMER_POINT
+
 	// do forward kinematics:
 	last_trajectory_collision_free_ = performForwardKinematics();
 
@@ -131,7 +133,7 @@ double EvaluationManager::evaluate()
 	// update parameters
 
     UPDATE_TIME
-    PRINT_TIME(evaluate, 10000)
+    PRINT_TIME(evaluate, 10)
 
 	return data_->costAccumulator_.getTrajectoryCost();
 }
@@ -474,8 +476,6 @@ void EvaluationManager::render(int trajectory_index, bool is_best)
 	{
         VisualizationManager::getInstance()->animateEndeffector(trajectory_index, full_vars_start_, full_vars_end_,
                 data_->segment_frames_, is_best);
-		//VisualizationManager::getInstance()->animateCoM(num_vars_full_,
-		//	full_vars_start_, data_->CoMPositions_, false);
 	}
 
 }
@@ -820,17 +820,19 @@ void EvaluationManager::updateCoM(int point)
 
 void EvaluationManager::computeCollisionCosts(int begin, int end)
 {
+    if (PlanningParameters::getInstance()->getObstacleCostWeight() == 0.0)
+        return;
+
 	int num_all_joints = data_->kinematic_state_[0]->getVariableCount();
 
-	int num_threads = getNumParallelThreads();
+    int num_threads = getNumParallelThreads();
 
 	collision_detection::CollisionRequest collision_request;
 	collision_request.verbose = false;
 	collision_request.contacts = true;
 	collision_request.max_contacts = 1000;
 
-	std::vector<collision_detection::CollisionResult> collision_result(
-        num_threads);
+    std::vector<collision_detection::CollisionResult> collision_result(num_threads);
 	std::vector<std::vector<double> > positions(num_threads);
 
 	for (int i = 0; i < num_threads; ++i)
@@ -843,33 +845,25 @@ void EvaluationManager::computeCollisionCosts(int begin, int end)
     #pragma omp parallel for
 	for (int i = safe_begin; i < safe_end; ++i)
 	{
-		int thread_num = omp_get_thread_num();
+        int thread_num = omp_get_thread_num();
 
 		double depthSum = 0.0;
 
 		int full_traj_index = getGroupTrajectory()->getFullTrajectoryIndex(i);
 		for (std::size_t k = 0; k < num_all_joints; k++)
 		{
-			positions[thread_num][k] = (*getFullTrajectory())(full_traj_index,
-                                       k);
+            positions[thread_num][k] = (*getFullTrajectory())(full_traj_index, k);
 		}
-		data_->kinematic_state_[thread_num]->setVariablePositions(
-            &positions[thread_num][0]);
-		data_->planning_scene_->checkCollisionUnpadded(collision_request,
-				collision_result[thread_num],
+        data_->kinematic_state_[thread_num]->setVariablePositions(&positions[thread_num][0]);
+        data_->planning_scene_->checkCollisionUnpadded(collision_request, collision_result[thread_num],
 				*data_->kinematic_state_[thread_num]);
 
-		const collision_detection::CollisionResult::ContactMap& contact_map =
-            collision_result[thread_num].contacts;
-		for (collision_detection::CollisionResult::ContactMap::const_iterator it =
-                    contact_map.begin(); it != contact_map.end(); ++it)
+        const collision_detection::CollisionResult::ContactMap& contact_map = collision_result[thread_num].contacts;
+        for (collision_detection::CollisionResult::ContactMap::const_iterator it = contact_map.begin(); it != contact_map.end(); ++it)
 		{
 			const collision_detection::Contact& contact = it->second[0];
 
 			depthSum += contact.depth;
-
-			// for debug
-			//ROS_INFO("[%d] Collision between %s and %s : %f", i, contact.body_name_1.c_str(), contact.body_name_2.c_str(), contact.depth);
 
 			last_trajectory_collision_free_ = false;
 		}

@@ -601,6 +601,7 @@ void VisualizationManager::animateEndeffector(int trajectory_index, int point_st
 {
 	const double trajectory_color_diff = 0.33;
 	const double scale = 0.005;
+    const double scale2 = 0.0025;
 	const int marker_step = 1;
 
 	visualization_msgs::Marker::_color_type YELLOW, LIGHT_YELLOW;
@@ -619,7 +620,7 @@ void VisualizationManager::animateEndeffector(int trajectory_index, int point_st
 	LIGHT_YELLOW = YELLOW;
 	LIGHT_YELLOW.b = 0.5;
 
-	visualization_msgs::Marker msg;
+    visualization_msgs::Marker msg, msg2;
 	msg.header.frame_id = reference_frame_;
 	msg.header.stamp = ros::Time::now();
 	msg.ns = best ? "itomp_best_endeffector" : "itomp_endeffector";
@@ -632,20 +633,34 @@ void VisualizationManager::animateEndeffector(int trajectory_index, int point_st
 
 	msg.points.resize(0);
 
+    msg2 = msg;
+    msg2.ns = best ? "itomp_best_endeffector_path" : "itomp_endeffector_path";
+    msg2.type = visualization_msgs::Marker::LINE_STRIP;
+    msg2.scale.x = msg2.scale.y = msg2.scale.z = scale2;
+
     for (unsigned int index = 0; index < animate_endeffector_segment_numbers_.size(); ++index)
 	{
 		if (index != 0)
 			break;
 
-        msg.id = (best ? 0 : trajectory_index) * animate_endeffector_segment_numbers_.size() + index;
+        if (best)
+        {
+            msg.id = index;
+            msg2.id = index;
 
-		msg.color = best ? (index == 0 ? YELLOW : LIGHT_YELLOW) : (index == 0 ? RED : LIGHT_RED);
+            msg2.color = msg.color = (index == 0 ? YELLOW : LIGHT_YELLOW);
+        }
+        else
+        {
+            msg.id = trajectory_index * animate_endeffector_segment_numbers_.size() + index;
+            msg2.id = msg.id;
+
+            msg2.color = msg.color = (index == 0 ? RED : LIGHT_RED);
+        }
 
 		int sn = animate_endeffector_segment_numbers_[index];
 		if (sn <= 0)
 			continue;
-
-		geometry_msgs::Point prevPt;
 
 		for (int j = point_start; j < point_end; j += marker_step)
 		{
@@ -654,9 +669,10 @@ void VisualizationManager::animateEndeffector(int trajectory_index, int point_st
 			point.y = segmentFrames[j][sn].p.y();
 			point.z = segmentFrames[j][sn].p.z();
 			msg.points.push_back(point);
+            msg2.points.push_back(point);
 		}
 		publish(msg);
-
+        publish(msg2);
 	}
 }
 
