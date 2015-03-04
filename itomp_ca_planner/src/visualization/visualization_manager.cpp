@@ -27,7 +27,7 @@ VisualizationManager::~VisualizationManager()
 void VisualizationManager::render()
 {
 	//renderGround();
-	renderEnvironment();
+    //renderEnvironment();
 
 }
 
@@ -605,18 +605,18 @@ void VisualizationManager::animateEndeffector(int trajectory_index, int point_st
 	const int marker_step = 1;
 
 	visualization_msgs::Marker::_color_type YELLOW, LIGHT_YELLOW;
-	visualization_msgs::Marker::_color_type RED, LIGHT_RED;
-	RED.a = 1.0;
-	RED.r = 1.0;
-	RED.g = 0.0;
-	RED.b = 0.0;
+    visualization_msgs::Marker::_color_type ORANGE, LIGHT_ORANGE;
+    ORANGE.a = 1.0;
+    ORANGE.r = 1.0;
+    ORANGE.g = 0.6;
+    ORANGE.b = 0.0;
 	YELLOW.a = 1.0;
 	YELLOW.r = 1.0;
 	YELLOW.g = 1.0;
 	YELLOW.b = 0.0;
-	LIGHT_RED = RED;
-	LIGHT_RED.g = 0.5;
-	LIGHT_RED.b = 0.5;
+    LIGHT_ORANGE = ORANGE;
+    LIGHT_ORANGE.g = 0.8;
+    LIGHT_ORANGE.b = 0.5;
 	LIGHT_YELLOW = YELLOW;
 	LIGHT_YELLOW.b = 0.5;
 
@@ -655,7 +655,7 @@ void VisualizationManager::animateEndeffector(int trajectory_index, int point_st
             msg.id = trajectory_index * animate_endeffector_segment_numbers_.size() + index;
             msg2.id = msg.id;
 
-            msg2.color = msg.color = (index == 0 ? RED : LIGHT_RED);
+            msg2.color = msg.color = (index == 0 ? ORANGE : LIGHT_ORANGE);
         }
 
 		int sn = animate_endeffector_segment_numbers_[index];
