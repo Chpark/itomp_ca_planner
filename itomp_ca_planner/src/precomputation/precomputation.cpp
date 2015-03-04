@@ -320,7 +320,7 @@ void Precomputation::createRoadmap(int milestones)
 	while (states_.size() < milestones)
 	{
         growRoadmap(
-          PlanningParameters::getInstance()->getPrecomputationGrowMilestones());
+            PlanningParameters::getInstance()->getPrecomputationGrowMilestones());
 		expandRoadmap(
             PlanningParameters::getInstance()->getPrecomputationExpandMilestones());
 
@@ -691,7 +691,7 @@ std::vector<const robot_state::RobotState*> Precomputation::smoothPath(const std
         i = j - 1;
     }
 
-    new_path = path;
+    //new_path = path;
 
     printf("Path smoothing : %d -> %d\n", path.size(), new_path.size());
     for (int i = 0; i < new_path.size(); ++i)
@@ -992,6 +992,13 @@ void Precomputation::extractInitialTrajectories(moveit_msgs::TrajectoryConstrain
 		}
 		traj_constraint_begin += num_points;
 	}
+}
+
+void Precomputation::reset()
+{
+    g_.clear();
+    paths_.clear();
+    states_.clear();
 }
 
 }

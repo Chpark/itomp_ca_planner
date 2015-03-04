@@ -135,6 +135,7 @@ void MoveKukaTest::run(const std::string& group_name)
     goal_states.resize(100, planning_scene_->getCurrentStateNonConst());
 
     // OMPL RRT makes jerky motion
+    /*
     start_state.getVariablePositions()[0] = -2.425220317795919;
     start_state.getVariablePositions()[1] = 0.989476608237034;
     start_state.getVariablePositions()[2] = 2.936041322472815;
@@ -143,6 +144,7 @@ void MoveKukaTest::run(const std::string& group_name)
     start_state.getVariablePositions()[5] = 0.763634781820519;
     start_state.getVariablePositions()[6] = -0.998423896960790;
     start_state.update(true);
+    */
 
 	initStartGoalStates(start_state, goal_states);
 
@@ -357,6 +359,13 @@ void MoveKukaTest::plan(planning_interface::MotionPlanRequest& req,
 
 	planning_interface::PlanningContextPtr context =
         itomp_planner_instance_->getPlanningContext(planning_scene_, req, res.error_code_);
+
+    /*
+    moveit_msgs::Constraints constraints;
+    moveit_msgs::OrientationConstraint oc;
+    moveit_msgs::PositionConstraint pc;
+    req.trajectory_constraints
+    */
 
 
 	context->solve(res);
@@ -659,6 +668,9 @@ void MoveKukaTest::drawPath(int id, const Eigen::Vector3d& from,
 
 int main(int argc, char **argv)
 {
+    // for debug
+    setbuf(stdout, NULL);
+
 	ros::init(argc, argv, "move_itomp");
 	ros::AsyncSpinner spinner(1);
 	spinner.start();

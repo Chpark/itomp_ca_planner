@@ -107,6 +107,7 @@ void TrajectoryCostAccumulator::print(int number) const
 	if (cost < best_cost_)
 	{
 		best_cost_ = cost;
+
 		printf("[%d] Trajectory cost : %f/%f (s=%f, c=%f, ci=%f pv=%f ct=%f)\n",
 				number, cost, best_cost_,
 				getTrajectoryCost(TrajectoryCost::COST_SMOOTHNESS),
@@ -114,7 +115,7 @@ void TrajectoryCostAccumulator::print(int number) const
 				getTrajectoryCost(TrajectoryCost::COST_CONTACT_INVARIANT),
 				getTrajectoryCost(TrajectoryCost::COST_PHYSICS_VIOLATION),
 				getTrajectoryCost(TrajectoryCost::COST_CARTESIAN_TRAJECTORY));
-	}
+    }
 }
 
 bool TrajectoryCostAccumulator::isFeasible() const

@@ -83,13 +83,18 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
 	getPlanningGroups(planningGroups, req.group_name);
 
     Precomputation::getInstance()->initialize(planning_scene, robot_model_, req.group_name);
-	Precomputation::getInstance()->createRoadmap();
+
 
 	int num_trials = PlanningParameters::getInstance()->getNumTrials();
 	//resetPlanningInfo(num_trials, planningGroups.size());
 	for (int c = planning_count_; c < planning_count_ + num_trials; ++c)
 	{
 		printf("Trial [%d]\n", c);
+
+        // for benchmark
+        Precomputation::getInstance()->reset();
+
+        Precomputation::getInstance()->createRoadmap();
 
 		// initialize trajectory with start state
 		initTrajectory(req.start_state.joint_state);
@@ -242,9 +247,9 @@ void ItompPlannerNode::trajectoryOptimization(const string& groupName,
         const planning_interface::MotionPlanRequest &req,
         const planning_scene::PlanningSceneConstPtr& planning_scene)
 {
-	ros::WallTime create_time = ros::WallTime::now();
-
     fillGroupJointTrajectory(groupName, req, planning_scene);
+
+    ros::WallTime create_time = ros::WallTime::now();
 
     int num_trajectories = PlanningParameters::getInstance()->getNumTrajectories();
 	const ItompPlanningGroup* group = robot_model_.getPlanningGroup(groupName);
@@ -362,10 +367,12 @@ void ItompPlannerNode::fillGroupJointTrajectory(const string& group_name,
         {
             if (collisionAwareIK(robot_state, end_effector_transform, group_name, link_name, planning_scene))
             {
+                /*
                 printf("[%d] : ", i);
                 for (int i = 0; i < robot_state.getVariableCount(); ++i)
                     printf("%f ", robot_state.getVariablePositions()[i]);
                 printf("\n");
+                */
                 robot_states.push_back(robot_state);
 
                 const double DELTA = 0.04;
@@ -422,12 +429,14 @@ void ItompPlannerNode::fillGroupJointTrajectory(const string& group_name,
                 const Eigen::Affine3d& new_transform3 = new_state.getGlobalLinkTransform(link_name);
                 Eigen::Vector3d ea3 = new_transform3.linear().eulerAngles(0, 1, 2);
 
+                /*
                 for (int j = 0; j < 7; ++j)
                     printf("%f ", robot_state.getVariablePositions()[j]);
                 printf("\n");
                 for (int j = 0; j < 7; ++j)
                     printf("%f ", new_state.getVariablePositions()[j]);
                 printf("\n");
+                */
 
 
 

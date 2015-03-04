@@ -106,6 +106,8 @@ public:
 
 	void extractInitialTrajectories(moveit_msgs::TrajectoryConstraints& trajectory_constraints);
 
+        void reset();
+
 protected:
 	double costHeuristic(Vertex u, Vertex v) const;
         double costWorkspace(Vertex u, Vertex v) const;

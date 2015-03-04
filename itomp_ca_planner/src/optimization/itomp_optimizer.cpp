@@ -75,17 +75,17 @@ bool ItompOptimizer::optimize()
 	{
 		while (iteration_ < num_iterations)
 		{
-            /*
+
             if (best_cost_manager_->isSolutionFound())
 			{
                 break;
 			}
-            */
+
 
             double start = ros::Time::now().toSec();
 			improvement_manager_->runSingleIteration(iteration_);
             double elapsed = ros::Time::now().toSec() - start;
-            ROS_INFO("Iteration time : %f", elapsed);
+            //ROS_INFO("Iteration time : %f", elapsed);
 
 
 			is_feasible = evaluation_manager_.isLastTrajectoryFeasible();
@@ -97,11 +97,9 @@ bool ItompOptimizer::optimize()
 			if (is_feasible)
 			{
 				++iteration_after_solution;
-				/*
-				 if (iteration_after_solution
-				 > PlanningParameters::getInstance()->getMaxIterationsAfterCollisionFree())
-				 break;
-				 */
+
+                 if (iteration_after_solution > PlanningParameters::getInstance()->getMaxIterationsAfterCollisionFree())
+                    break;
 			}
 
 			if (!is_updated)

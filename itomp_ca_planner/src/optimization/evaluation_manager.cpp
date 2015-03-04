@@ -42,7 +42,7 @@ void EvaluationManager::initialize(ItompCIOTrajectory *full_trajectory,
                                    const moveit_msgs::Constraints& path_constraints,
                                    const planning_scene::PlanningSceneConstPtr& planning_scene)
 {
-	omp_set_num_threads(getNumParallelThreads());
+    //omp_set_num_threads(getNumParallelThreads());
 
 	planning_start_time_ = planning_start_time;
 	trajectory_start_time_ = trajectory_start_time;
@@ -133,7 +133,7 @@ double EvaluationManager::evaluate()
 	// update parameters
 
     UPDATE_TIME
-    PRINT_TIME(evaluate, 10)
+    //PRINT_TIME(evaluate, 10)
 
 	return data_->costAccumulator_.getTrajectoryCost();
 }
