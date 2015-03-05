@@ -27,3 +27,4 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 rosbuild_add_executable(move_kuka_test src/move_kuka_test.cpp)
+rosbuild_add_executable(move_kuka_bench2 src/move_kuka_bench2.cpp)

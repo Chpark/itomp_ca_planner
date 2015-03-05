@@ -474,16 +474,16 @@ void ItompPlannerNode::fillGroupJointTrajectory(const string& group_name,
                                             precomputation_trajectory_constraints, start_point_velocities_.row(0),
                                             start_point_accelerations_.row(0));
 		}
-        else if (req.path_constraints.position_constraints.size() == 0)
-		{
-			trajectories_[i]->fillInMinJerk(groupJointsKDLIndices,
-                                            start_point_velocities_.row(0),
-                                            start_point_accelerations_.row(0));
-		}
-		else
+        else if (req.path_constraints.position_constraints.size() != 0)
 		{
             trajectories_[i]->fillInMinJerkCartesianTrajectory(groupJointsKDLIndices, start_point_velocities_.row(0),
                     start_point_accelerations_.row(0), req.path_constraints, group_name);
+		}
+		else
+		{
+            trajectories_[i]->fillInMinJerk(groupJointsKDLIndices,
+                                            start_point_velocities_.row(0),
+                                            start_point_accelerations_.row(0));
 		}
 	}
 }

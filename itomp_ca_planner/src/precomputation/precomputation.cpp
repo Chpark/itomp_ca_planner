@@ -15,7 +15,8 @@
 namespace itomp_ca_planner
 {
 
-const std::string END_EFFECTOR_NAME = "tcp_1_link";
+//const std::string END_EFFECTOR_NAME = "tcp_1_link";
+const std::string END_EFFECTOR_NAME = "tcp_2_link";
 flann::SearchParams FLANN_PARAMS;
 
 Precomputation::Precomputation() :
@@ -803,8 +804,7 @@ void Precomputation::renderPaths()
 				from->interpolate(*to, (double) k / (double) nd, test);
 				test.updateLinkTransforms();
 
-				const Eigen::Affine3d& transform = test.getGlobalLinkTransform(
-                                                       "tcp_1_link");
+                const Eigen::Affine3d& transform = test.getGlobalLinkTransform(END_EFFECTOR_NAME);
 
 				point.x = transform.translation()(0);
 				point.y = transform.translation()(1);
@@ -814,8 +814,7 @@ void Precomputation::renderPaths()
                 k = nd;
 			}
 
-            const Eigen::Affine3d& transform = to->getGlobalLinkTransform(
-                                                   "tcp_1_link");
+            const Eigen::Affine3d& transform = to->getGlobalLinkTransform(END_EFFECTOR_NAME);
 
             point.x = transform.translation()(0);
             point.y = transform.translation()(1);
@@ -843,8 +842,7 @@ void Precomputation::renderPaths()
                 from->interpolate(*to, (double) k / (double) nd, test);
                 test.updateLinkTransforms();
 
-                const Eigen::Affine3d& transform = test.getGlobalLinkTransform(
-                                                       "tcp_1_link");
+                const Eigen::Affine3d& transform = test.getGlobalLinkTransform(END_EFFECTOR_NAME);
 
                 point.x = transform.translation()(0);
                 point.y = transform.translation()(1);
@@ -904,8 +902,7 @@ void Precomputation::renderPRMGraph()
 	{
         msg.points.resize(0);
 
-		const Eigen::Affine3d& transform =
-            stateProperty_[v]->getGlobalLinkTransform("tcp_1_link");
+        const Eigen::Affine3d& transform = stateProperty_[v]->getGlobalLinkTransform(END_EFFECTOR_NAME);
 		point.x = transform.translation()(0);
 		point.y = transform.translation()(1);
 		point.z = transform.translation()(2);
@@ -932,16 +929,14 @@ void Precomputation::renderPRMGraph()
 		const Vertex u = boost::source(e, g_);
 		const Vertex v = boost::target(e, g_);
 
-		const Eigen::Affine3d& transform =
-            stateProperty_[u]->getGlobalLinkTransform("tcp_1_link");
+        const Eigen::Affine3d& transform = stateProperty_[u]->getGlobalLinkTransform(END_EFFECTOR_NAME);
 
 		point.x = transform.translation()(0);
 		point.y = transform.translation()(1);
 		point.z = transform.translation()(2);
 		msg.points.push_back(point);
 
-		const Eigen::Affine3d& transform2 =
-            stateProperty_[v]->getGlobalLinkTransform("tcp_1_link");
+        const Eigen::Affine3d& transform2 = stateProperty_[v]->getGlobalLinkTransform(END_EFFECTOR_NAME);
 		point.x = transform2.translation()(0);
 		point.y = transform2.translation()(1);
 		point.z = transform2.translation()(2);
