@@ -53,6 +53,18 @@ inline bool pathCompare(
 	return p1.second < p2.second;
 }
 
+inline bool uniqueCompare(
+        const std::pair<std::vector<const robot_state::RobotState*>, double>& p1,
+        const std::pair<std::vector<const robot_state::RobotState*>, double>& p2)
+{
+        for (int i = 0; i < p1.first.size(); ++i)
+        {
+            if (p1.first[i] != p2.first[i])
+                return false;
+            return true;
+        }
+}
+
 class Precomputation : public Singleton<Precomputation>
 {
 public:

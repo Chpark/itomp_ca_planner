@@ -11,6 +11,7 @@
 #include <itomp_ca_planner/util/planning_parameters.h>
 #include <omp.h>
 #include <boost/graph/connected_components.hpp>
+#include <algorithm>
 
 namespace itomp_ca_planner
 {
@@ -412,20 +413,23 @@ void Precomputation::addStartState(const robot_state::RobotState& from)
 {
 	int dim = from.getVariableCount();
 
-	const int NN = PlanningParameters::getInstance()->getPrecomputationNn() + 1;
+    const int NN = PlanningParameters::getInstance()->getPrecomputationNn();
+
+    int data_size = states_.size();
+    int safe_nn = std::min(data_size, NN);
 
 	states_.resize(states_.size() + 1);
 	int milestones = states_.size();
 	states_[milestones - 1] = new robot_state::RobotState(from);
 
 	// find nearest neighbors
-    flann::Matrix<double> dataset(new double[milestones * dim], milestones, dim);
+    flann::Matrix<double> dataset(new double[data_size * dim], data_size, dim);
 	const flann::Matrix<double> query(new double[1 * dim], 1, dim);
-	flann::Matrix<int> indices(new int[query.rows * NN], query.rows, NN);
-	flann::Matrix<double> dists(new double[query.rows * NN], query.rows, NN);
+    flann::Matrix<int> indices(new int[query.rows * safe_nn], query.rows, safe_nn);
+    flann::Matrix<double> dists(new double[query.rows * safe_nn], query.rows, safe_nn);
 	{
 		double* data_ptr = dataset.ptr();
-		for (int i = 0; i < milestones; ++i)
+        for (int i = 0; i < data_size; ++i)
 		{
             memcpy(data_ptr, states_[i]->getVariablePositions(), sizeof(double) * dim);
 			data_ptr += dim;
@@ -435,8 +439,11 @@ void Precomputation::addStartState(const robot_state::RobotState& from)
 
 		// do a knn search, using flann libarary
         flann::Index<flann::L2<double> > index(dataset, flann::KDTreeIndexParams(4));
-		index.buildIndex();
-        index.knnSearch(query, indices, dists, NN, FLANN_PARAMS);
+        if (safe_nn > 0)
+        {
+            index.buildIndex();
+            index.knnSearch(query, indices, dists, safe_nn, FLANN_PARAMS);
+        }
 	}
 
 	// add to graph
@@ -459,10 +466,10 @@ void Precomputation::addStartState(const robot_state::RobotState& from)
 	// add edges
 	for (int i = milestones - 1; i < milestones; ++i)
 	{
-		for (int j = 1; j < NN; ++j)
+        for (int j = 0; j < safe_nn; ++j)
 		{
-			int index = indices.ptr()[(i - (milestones - 1)) * NN + j];
-			double weight = sqrt(dists.ptr()[(i - (milestones - 1)) * NN + j]);
+            int index = indices.ptr()[(i - (milestones - 1)) * safe_nn + j];
+            double weight = sqrt(dists.ptr()[(i - (milestones - 1)) * safe_nn + j]);
 
 			bool result = true;
 
@@ -490,49 +497,45 @@ void Precomputation::addStartState(const robot_state::RobotState& from)
 	delete[] dists.ptr();
 }
 
-void Precomputation::addGoalStates(
-    const std::vector<robot_state::RobotState>& to)
+void Precomputation::addGoalStates(const std::vector<robot_state::RobotState>& to)
 {
-	const int NN = PlanningParameters::getInstance()->getPrecomputationNn() + 1;
+    const int NN = PlanningParameters::getInstance()->getPrecomputationNn();
 
 	goal_vertices_.clear();
 	int dim = to[0].getVariableCount();
 	int num_goal_states = to.size();
 
+    int data_size = states_.size();
+    int safe_nn = std::min(data_size, NN);
+
 	states_.resize(states_.size() + num_goal_states);
 	int milestones = states_.size();
 	for (int i = 0; i < num_goal_states; ++i)
-		states_[milestones - num_goal_states + i] = new robot_state::RobotState(
-            to[i]);
+        states_[milestones - num_goal_states + i] = new robot_state::RobotState(to[i]);
 
 	// find nearest neighbors
-	flann::Matrix<double> dataset(new double[milestones * dim], milestones,
-                                  dim);
-	const flann::Matrix<double> query(new double[num_goal_states * dim],
-                                      num_goal_states, dim);
-	flann::Matrix<int> indices(new int[query.rows * NN], query.rows, NN);
-	flann::Matrix<double> dists(new double[query.rows * NN], query.rows, NN);
+    flann::Matrix<double> dataset(new double[data_size * dim], data_size, dim);
+    const flann::Matrix<double> query(new double[num_goal_states * dim], num_goal_states, dim);
+    flann::Matrix<int> indices(new int[query.rows * safe_nn], query.rows, safe_nn);
+    flann::Matrix<double> dists(new double[query.rows * safe_nn], query.rows, safe_nn);
 	{
 		double* data_ptr = dataset.ptr();
-		for (int i = 0; i < milestones; ++i)
+        for (int i = 0; i < data_size; ++i)
 		{
-			memcpy(data_ptr, states_[i]->getVariablePositions(),
-                   sizeof(double) * dim);
+            memcpy(data_ptr, states_[i]->getVariablePositions(), sizeof(double) * dim);
 			data_ptr += dim;
 		}
 		double* query_ptr = query.ptr();
 		for (int i = 0; i < num_goal_states; ++i)
 		{
-			memcpy(query_ptr, to[i].getVariablePositions(),
-                   sizeof(double) * dim);
+            memcpy(query_ptr, to[i].getVariablePositions(), sizeof(double) * dim);
 			query_ptr += dim;
 		}
 
 		// do a knn search, using flann libarary
-		flann::Index<flann::L2<double> > index(dataset,
-                                               flann::KDTreeIndexParams(4));
+        flann::Index<flann::L2<double> > index(dataset, flann::KDTreeIndexParams(4));
 		index.buildIndex();
-        index.knnSearch(query, indices, dists, NN, FLANN_PARAMS);
+        index.knnSearch(query, indices, dists, safe_nn, FLANN_PARAMS);
 	}
 
 	// add to graph
@@ -555,12 +558,10 @@ void Precomputation::addGoalStates(
 	// add edges
 	for (int i = milestones - num_goal_states; i < milestones; ++i)
 	{
-		for (int j = 1; j < NN; ++j)
+        for (int j = 0; j < safe_nn; ++j)
 		{
-			int index = indices.ptr()[(i - (milestones - num_goal_states)) * NN
-                                      + j];
-			double weight = sqrt(
-                                dists.ptr()[(i - (milestones - num_goal_states)) * NN + j]);
+            int index = indices.ptr()[(i - (milestones - num_goal_states)) * safe_nn + j];
+            double weight = sqrt(dists.ptr()[(i - (milestones - num_goal_states)) * safe_nn + j]);
 
 			bool result = true;
 
@@ -570,9 +571,15 @@ void Precomputation::addGoalStates(
 			if (result)
 			{
 				const Graph::edge_property_type properties(weight);
-				boost::add_edge(graph_vertices[i], graph_vertices[index],
-                                properties, g_);
+                boost::add_edge(graph_vertices[i], graph_vertices[index], properties, g_);
 			}
+
+            printf("Goal %d NN %d (%f) : ", i, j, weight);
+            for (int k = 0; k < dim; ++k)
+            {
+                printf("%f ", states_[index]->getVariablePositions()[k]);
+            }
+            printf("\n");
 		}
 	}
 
@@ -661,6 +668,7 @@ bool Precomputation::extractPaths(int num_paths)
 	}
 
 	sort(paths_.begin(), paths_.end(), pathCompare);
+    std::unique(paths_.begin(), paths_.end(), uniqueCompare);
 	if (paths_.size() > num_paths)
 		paths_.resize(num_paths);
 
