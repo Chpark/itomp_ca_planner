@@ -61,8 +61,8 @@ inline bool uniqueCompare(
         {
             if (p1.first[i] != p2.first[i])
                 return false;
-            return true;
         }
+        return true;
 }
 
 class Precomputation : public Singleton<Precomputation>

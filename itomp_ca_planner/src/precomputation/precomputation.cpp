@@ -482,12 +482,14 @@ void Precomputation::addStartState(const robot_state::RobotState& from)
                 boost::add_edge(graph_vertices[i], graph_vertices[index], properties, g_);
 			}
 
+            /*
             printf("Start NN %d (%f) : ", j, weight);
             for (int k = 0; k < dim; ++k)
             {
                 printf("%f ", states_[index]->getVariablePositions()[k]);
             }
             printf("\n");
+            */
 		}
 	}
 
@@ -574,12 +576,14 @@ void Precomputation::addGoalStates(const std::vector<robot_state::RobotState>& t
                 boost::add_edge(graph_vertices[i], graph_vertices[index], properties, g_);
 			}
 
+            /*
             printf("Goal %d NN %d (%f) : ", i, j, weight);
             for (int k = 0; k < dim; ++k)
             {
                 printf("%f ", states_[index]->getVariablePositions()[k]);
             }
             printf("\n");
+            */
 		}
 	}
 
@@ -638,6 +642,7 @@ bool Precomputation::extractPaths(int num_paths)
 			path.push_back(stateProperty_[start_vertex_]);
 			std::reverse(path.begin(), path.end());
 
+            /*
 			if (i == 0)
 			{
 				if (path_cost > best_cost)
@@ -646,12 +651,15 @@ bool Precomputation::extractPaths(int num_paths)
 				best_cost = path_cost;
 				paths_.clear();
 			}
+            */
 
-            path = smoothPath(path);
+            //path = smoothPath(path);
 
-			paths_.push_back(
-                std::make_pair<std::vector<const robot_state::RobotState*>,
-                double>(path, path_cost));
+            if (paths_.size() == 0 || uniqueCompare(std::make_pair<std::vector<const robot_state::RobotState*>,
+                                                    double>(path, path_cost), paths_.back()) == false)
+                paths_.push_back(
+                    std::make_pair<std::vector<const robot_state::RobotState*>,
+                    double>(path, path_cost));
 		}
 
 		// restore
@@ -668,7 +676,24 @@ bool Precomputation::extractPaths(int num_paths)
 	}
 
 	sort(paths_.begin(), paths_.end(), pathCompare);
+    int before = paths_.size();
     std::unique(paths_.begin(), paths_.end(), uniqueCompare);
+    int after = paths_.size();
+    /*
+    ROS_INFO("Unique : %d -> %d", before, after);
+    for (int k = 0; k < paths_.size(); ++k)
+    {
+        printf("Path %d\n", k);
+        for (int i = 0; i < paths_[k].first.size(); ++i)
+        {
+            printf("%d :", i);
+            const robot_state::RobotState* state = paths_[k].first[i];
+            for (int j = 0; j < state->getVariableCount(); ++j)
+                printf("%f ", state->getVariablePositions()[j]);
+            printf("\n");
+        }
+    }
+    */
 	if (paths_.size() > num_paths)
 		paths_.resize(num_paths);
 

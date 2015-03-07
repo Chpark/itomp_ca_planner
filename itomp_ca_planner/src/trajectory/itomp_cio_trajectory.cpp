@@ -574,16 +574,16 @@ void ItompCIOTrajectory::fillInMinJerk(int trajectory_index,
             //ecl::CubicSpline cubic;
 			ecl::Array<double> array_x(num_constraint_points);
 			ecl::Array<double> array_y(num_constraint_points);
-            printf("Joint %d\n", j);
+            //printf("Joint %d\n", j);
 			for (int k = 0; k < num_constraint_points; ++k)
 			{
 				int point = k + traj_constraint_begin;
 
                 array_x[k] = accumulated_distances[k];
                 array_y[k] = trajectory_constraints.constraints[point].joint_constraints[constraint_index].position;
-                printf("%f : %f\n", array_x[k], array_y[k]);
+                //printf("%f : %f\n", array_x[k], array_y[k]);
 			}
-            printf("\n");
+            //printf("\n");
             //cubic = ecl::CubicSpline::Natural(array_x, array_y);
             spline = ecl::SmoothLinearSpline(array_x, array_y, 50.0);
             for (int i = 0; i < getNumPoints(); ++i)
@@ -593,7 +593,7 @@ void ItompCIOTrajectory::fillInMinJerk(int trajectory_index,
                 double value = spline(x);
 				(*this)(i, j) = value;
 			}
-            printf("Joint %d...done\n", j);
+            //printf("Joint %d...done\n", j);
 		}
 		++group_joint_index;
 	}
