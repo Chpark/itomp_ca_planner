@@ -89,6 +89,17 @@ void EvaluationManager::initialize(ItompCIOTrajectory *full_trajectory,
 	{
 		phaseJointArray_[i].resize(robot_model_->getKDLTree()->getNrOfJoints());
 	}
+
+    min_jerk_curve_.resize(num_vars_full_);
+    for (int i = 0; i < num_vars_full_; ++i)
+    {
+        double t = (double)i / (num_vars_full_ - 1);
+        double t3 = t * t * t;
+        double t4 = t3 * t;
+        double t5 = t4 * t;
+        min_jerk_curve_[i] = 6.0 * t5 - 15.0 * t4 + 10.0 * t3;
+    }
+
 }
 
 double EvaluationManager::evaluate()
@@ -1044,6 +1055,19 @@ void EvaluationManager::computeCartesianTrajectoryCosts()
 		{
             KDL::Frame& frame = data_->segment_frames_[i][END_EFFECTOR_SEGMENT_INDEX];
 
+            // linear
+            //double t = min_jerk_curve_[i - (point_index - 1)];
+            double t = (double)(i - (point_index - 1)) / (num_vars_free);
+            KDL::Vector cartesian_pos = start_pos * (1.0 - t) + end_pos * t;
+            double distance = (frame.p - cartesian_pos).Norm();
+
+            if (distance > 0.01)
+                last_trajectory_collision_free_ = false;
+
+            data_->stateCartesianTrajectoryCost_[i] = distance * distance;
+
+
+            /*
 			double proj_dist = KDL::dot(dir, (frame.p - start_pos));
 			KDL::Vector proj_pt = proj_dist * dir;
 			if (proj_dist < 0)
@@ -1060,6 +1084,7 @@ void EvaluationManager::computeCartesianTrajectoryCosts()
 				last_trajectory_collision_free_ = false;
 
 			data_->stateCartesianTrajectoryCost_[i] = cost * cost;
+            */
 		}
 	}
 	else

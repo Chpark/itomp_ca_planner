@@ -160,6 +160,8 @@ private:
         void getJointIndex(int& groupIndex, int& kdlIndex, int joint, bool isLeft) const;
         KDL::JntArray phaseJointArray_[3];
 
+        std::vector<double> min_jerk_curve_;
+
         // for debug
         std::vector<double> timings_;
         int count_;
