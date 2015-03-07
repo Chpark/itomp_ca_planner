@@ -8,8 +8,8 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 #  RelWithDebInfo : w/ debug symbols, w/ optimization
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
 #set(ROS_BUILD_TYPE RelWithDebInfo)
-#set(ROS_BUILD_TYPE Debug)
-set(ROS_BUILD_TYPE Release)
+set(ROS_BUILD_TYPE Debug)
+#set(ROS_BUILD_TYPE Release)
 
 rosbuild_init()
 
@@ -28,3 +28,4 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 rosbuild_add_executable(move_kuka_test src/move_kuka_test.cpp)
 rosbuild_add_executable(move_kuka_bench2 src/move_kuka_bench2.cpp)
+rosbuild_add_executable(move_kuka_bench3 src/move_kuka_bench3.cpp)
