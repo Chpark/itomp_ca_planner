@@ -4,7 +4,7 @@ max_iterations: 2000
 max_iterations_after_collision_free: 100
 num_trajectories: 1
 
-precomputation_init_milestones: 0
+precomputation_init_milestones: 1000
 precomputation_add_milestones: 5000
 precomputation_grow_milestones: 1000
 precomputation_expand_milestones: 4000

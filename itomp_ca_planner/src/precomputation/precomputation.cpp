@@ -11,7 +11,12 @@
 #include <itomp_ca_planner/util/planning_parameters.h>
 #include <omp.h>
 #include <boost/graph/connected_components.hpp>
+#include <boost/graph/copy.hpp>
+#include <boost/graph/graph_traits.hpp>
+#include <boost/graph/adjacency_list.hpp>
 #include <algorithm>
+
+using namespace std;
 
 namespace itomp_ca_planner
 {
@@ -312,8 +317,301 @@ void Precomputation::expandRoadmap(int new_milestones)
 
 void Precomputation::createRoadmap()
 {
-	createRoadmap(
-        PlanningParameters::getInstance()->getPrecomputationInitMilestones());
+    int num_init_milestones = PlanningParameters::getInstance()->getPrecomputationInitMilestones();
+
+    if (num_init_milestones != 0)
+        createRoadmap(num_init_milestones);
+    else
+    {
+        computeVizPRM();
+        renderPRMGraph();
+        ROS_INFO("# of milestones : %d", states_.size());
+
+        std::vector<int> component(num_vertices(g_));
+        int num = connected_components(g_, &component[0]);
+        std::cout << "Total number of components: " << num << std::endl;
+
+        computePDR();
+        renderPRMGraph();
+        ROS_INFO("# of milestones : %d", states_.size());
+        num = connected_components(g_, &component[0]);
+        std::cout << "Total number of components: " << num << std::endl;
+    }
+}
+
+robot_state::RobotState* Precomputation::getNewFeasibleSample() const
+{
+    const robot_state::RobotState& current_state = planning_scene_->getCurrentState();
+    robot_state::RobotState* new_state = new robot_state::RobotState(current_state);
+    while (true)
+    {
+        new_state->setToRandomPositions();
+        new_state->update(true);
+        if (planning_scene_->isStateValid(*new_state))
+        {
+            return new_state;
+        }
+    }
+}
+void Precomputation::computePDR()
+{
+    const int ntry_max = 1000;
+
+    int last_max = 0;
+    int ntry = 0;
+
+    while (ntry < ntry_max)
+    {
+        robot_state::RobotState* new_state = getNewFeasibleSample();
+        bool added = false;
+
+        std::vector<int> component(num_vertices(g_));
+        int num_components = connected_components(g_, &component[0]);
+
+        Graph g;
+
+
+        std::set<int> visible_set;
+        std::map<int, int> graph_index_mapping;
+        std::map<int, int> graph_index_backward_mapping;
+
+        // Iterate through the vertices and add visible nodes to the new graph
+        BOOST_FOREACH (Vertex v, boost::vertices(g_))
+        {
+            double dist = distance(new_state, states_[v]);
+            if (localPlanning(*new_state, *states_[v], dist))
+            {
+                visible_set.insert(v);
+
+                // add vertex to the new graph
+                Vertex m = boost::add_vertex(g);
+
+                graph_index_mapping[v] = m;
+                graph_index_backward_mapping[m] = v;
+            }
+        }
+        // Iterate through the edges and add edges if two end nodes are visible
+        BOOST_FOREACH (const Edge e, boost::edges(g_))
+        {
+            const Vertex u = boost::source(e, g_);
+            const Vertex v = boost::target(e, g_);
+
+            if (visible_set.find(u) != visible_set.end() && visible_set.find(v) != visible_set.end())
+            {
+                // add edge
+                boost::add_edge(u, v, weightProperty_[e], g);
+            }
+        }
+
+        num_components = connected_components(g, &component[0]);
+
+        if (num_components == 1)
+        {
+            // edge visibility test
+            std::set<std::pair<int,int> > invisible_edge_set;
+            BOOST_FOREACH (const Edge e, boost::edges(g))
+            {
+                const Vertex u = boost::source(e, g);
+                const Vertex v = boost::target(e, g);
+
+                if (localEdgePlanning(*new_state, *states_[graph_index_backward_mapping[u]], *states_[graph_index_backward_mapping[v]]) == false)
+                {
+                    invisible_edge_set.insert(std::make_pair(u,v));
+                }
+            }
+
+            for (std::set<std::pair<int,int> >::iterator it = invisible_edge_set.begin(); it != invisible_edge_set.end(); ++it)
+            {
+                remove_edge(it->first, it->second, g);
+            }
+            num_components = connected_components(g, &component[0]);
+        }
+
+        if (num_components == 0)
+        {
+
+
+            // add vertex
+            Vertex m = boost::add_vertex(g_);
+            states_.push_back(new_state);
+            added = true;
+            stateProperty_[m] = states_[states_.size() - 1];
+
+            cout << "New vertex " << states_.size() - 1 << " : ";
+            for (int k = 0; k < 7; ++k)
+                cout << new_state->getVariablePositions()[k] << " ";
+            cout << endl;
+
+            renderPRMGraph();
+        }
+        else if (num_components == 1)
+        {
+
+        }
+        else
+        {
+            int last_vertex = -1;
+            int last_vertex_component = -1;
+            for (int i = 0; i < num_vertices(g_); ++i)
+            {
+                if (last_vertex_component == component[i])
+                    continue;
+
+                if (degree(graph_index_backward_mapping[i], g_) > 1)
+                    continue;
+
+                if (last_vertex == -1)
+                {
+                    last_vertex = i;
+                    last_vertex_component = component[i];
+                }
+                else
+                {
+                    // add vertex
+                    Vertex m = boost::add_vertex(g_);
+                    states_.push_back(new_state);
+                    added = true;
+                    int new_vertex_index = states_.size() - 1;
+                    stateProperty_[m] = states_[new_vertex_index];
+
+                    // add connector
+                    Vertex ou = graph_index_backward_mapping[last_vertex];
+                    const Graph::edge_property_type properties(distance(new_state, states_[ou]));
+                    boost::add_edge(new_vertex_index, ou, properties, g_);
+
+                    Vertex ov = graph_index_backward_mapping[i];
+                    const Graph::edge_property_type properties2(distance(new_state, states_[ov]));
+                    boost::add_edge(new_vertex_index, ov, properties2, g_);
+
+                    cout << "New vertex " << new_vertex_index << " : ";
+                    for (int k = 0; k < 7; ++k)
+                        cout << new_state->getVariablePositions()[k] << " ";
+                    cout << endl;
+
+
+                    renderPRMGraph();
+
+                    break;
+                }
+            }
+
+
+        }
+
+        if (!added)
+        {
+            delete new_state;
+            ++ntry;
+        }
+        else
+        {
+            if (ntry > last_max)
+            {
+                last_max = ntry;
+                ROS_INFO("Max ntry : %d", ntry);
+            }
+            ntry = 0;
+        }
+
+    }
+}
+
+void Precomputation::computeVizPRM()
+{
+    const int ntry_max = 1000;
+    int last_max = 0;
+    int ntry = 0;
+
+    int num_components = 0;
+
+    while (ntry < ntry_max)
+    {
+        robot_state::RobotState* new_state = getNewFeasibleSample();
+        bool added = false;
+
+        std::vector<int> component(num_vertices(g_));
+        num_components = connected_components(g_, &component[0]);
+
+        int last_vertex = -1;
+        int last_vertex_component = -1;
+        for (int i = 0; i < num_vertices(g_); ++i)
+        {
+            if (last_vertex_component == component[i])
+                continue;
+
+            double dist = distance(new_state, states_[i]);
+            if (localPlanning(*new_state, *states_[i], dist))
+            {
+                if (last_vertex == -1)
+                {
+                    last_vertex = i;
+                    last_vertex_component = component[i];
+                }
+                else
+                {
+                    // add vertex
+                    Vertex m = boost::add_vertex(g_);
+                    states_.push_back(new_state);
+                    added = true;
+                    int new_vertex_index = states_.size() - 1;
+                    stateProperty_[m] = states_[new_vertex_index];
+
+                    // add connector
+                    const Graph::edge_property_type properties(distance(new_state, states_[last_vertex]));
+                    boost::add_edge(new_vertex_index, last_vertex, properties, g_);
+
+                    const Graph::edge_property_type properties2(distance(new_state, states_[i]));
+                    boost::add_edge(new_vertex_index, i, properties2, g_);
+
+                    cout << "New vertex " << new_vertex_index << " : ";
+                    for (int k = 0; k < 7; ++k)
+                        cout << new_state->getVariablePositions()[k] << " ";
+                    cout << endl;
+
+
+                    renderPRMGraph();
+
+                    break;
+                }
+            }
+        }
+        if (last_vertex == -1)
+        {
+            // add vertex
+            Vertex m = boost::add_vertex(g_);
+            states_.push_back(new_state);
+            added = true;
+            stateProperty_[m] = states_[states_.size() - 1];
+
+            cout << "New vertex " << states_.size() - 1 << " : ";
+            for (int k = 0; k < 7; ++k)
+                cout << new_state->getVariablePositions()[k] << " ";
+            cout << endl;
+
+            //ntry = 0;
+
+            renderPRMGraph();
+        }
+        else
+        {
+            //++ntry;
+        }
+
+        if (!added)
+        {
+            delete new_state;
+            ++ntry;
+        }
+        else
+        {
+            if (ntry > last_max)
+            {
+                last_max = ntry;
+                ROS_INFO("Max ntry : %d cc : %d", ntry, num_components);
+            }
+            ntry = 0;
+        }
+    }
 }
 
 void Precomputation::createRoadmap(int milestones)
@@ -407,6 +705,28 @@ bool Precomputation::localPlanning(const robot_state::RobotState& from,
     }
 
 	return result;
+}
+
+bool Precomputation::localEdgePlanning(const robot_state::RobotState& from, const robot_state::RobotState& edge_start,
+                                       const robot_state::RobotState& edge_end) const
+{
+    const double LONGEST_VALID_SEGMENT_LENGTH =
+        PlanningParameters::getInstance()->getPrecomputationMaxValidSegmentDist();
+
+    double edge_distance = distance(&edge_start, &edge_end);
+
+    int nd = ceil(edge_distance / LONGEST_VALID_SEGMENT_LENGTH);
+
+    robot_state::RobotState test(edge_start);
+    for (int i = 0; i <= nd; ++i)
+    {
+        edge_start.interpolate(edge_end, (double)i / nd, test);
+
+        double dist = distance(&from, &test);
+        if (localPlanning(from, test, dist) == false)
+            return false;
+    }
+    return true;
 }
 
 void Precomputation::addStartState(const robot_state::RobotState& from)
@@ -898,7 +1218,7 @@ void Precomputation::renderPRMGraph()
 		return;
 
 	const double trajectory_color_diff = 0.33;
-	const double scale = 0.005, scale2 = 0.001;
+    const double scale = 0.01, scale2 = 0.0025;
 	const int marker_step = 1;
 
 	visualization_msgs::MarkerArray ma;
@@ -909,7 +1229,7 @@ void Precomputation::renderPRMGraph()
 	BLUE.b = 1.0;
 	LIGHT_YELLOW = BLUE;
     LIGHT_YELLOW.b = 0.0;
-	GREEN.a = 0.1;
+    GREEN.a = 1.0;
 	GREEN.r = 0.5;
 	GREEN.b = 0.5;
 	GREEN.g = 1.0;
@@ -940,7 +1260,7 @@ void Precomputation::renderPRMGraph()
 		point.y = transform.translation()(1);
 		point.z = transform.translation()(2);
 
-        msg.color.g = 1.0 * successfulConnectionAttemptsProperty_[v] / totalConnectionAttemptsProperty_[v];
+        msg.color.g = 1.0;
 
 		msg.points.push_back(point);
 

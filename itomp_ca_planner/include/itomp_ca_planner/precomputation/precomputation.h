@@ -106,6 +106,7 @@ public:
 	void addStartState(const robot_state::RobotState& from);
 	void addGoalStates(const std::vector<robot_state::RobotState>& to);
         bool localPlanning(const robot_state::RobotState& from, const robot_state::RobotState& to, double distance) const;
+        bool localEdgePlanning(const robot_state::RobotState& from, const robot_state::RobotState& edge_start, const robot_state::RobotState& edge_end) const;
 	bool extractPaths(int num_paths);
 
 	void growRoadmap(int new_milestones);
@@ -119,6 +120,10 @@ public:
 	void extractInitialTrajectories(moveit_msgs::TrajectoryConstraints& trajectory_constraints);
 
         void reset();
+
+        void computeVizPRM();
+        void computePDR();
+        robot_state::RobotState* getNewFeasibleSample() const;
 
 protected:
 	double costHeuristic(Vertex u, Vertex v) const;
