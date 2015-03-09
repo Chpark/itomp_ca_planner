@@ -43,7 +43,7 @@ namespace itomp_ca_planner
 {
 
 PlanningParameters::PlanningParameters() :
-		num_time_steps_(0), updateIndex(-1)
+    num_time_steps_(0), updateIndex(-1)
 {
 }
 
@@ -60,35 +60,35 @@ void PlanningParameters::initFromNodeHandle()
 	node_handle.param("planning_time_limit", planning_time_limit_, 1.0);
 	node_handle.param("max_iterations", max_iterations_, 500);
 	node_handle.param("max_iterations_after_collision_free",
-			max_iterations_after_collision_free_, 2);
+                      max_iterations_after_collision_free_, 2);
 	node_handle.param("num_trajectories", num_trajectories_, 1);
 	node_handle.param("trajectory_duration", trajectory_duration_, 5.0);
 	node_handle.param("trajectory_discretization", trajectory_discretization_,
-			0.05);
+                      0.05);
 
 	node_handle.param("smoothness_cost_weight", smoothness_cost_weight_,
-			0.0001);
+                      0.0001);
 	node_handle.param("obstacle_cost_weight", obstacle_cost_weight_, 1.0);
 	node_handle.param("torque_cost_weight", torque_cost_weight_, 0.0);
 	node_handle.param("state_validity_cost_weight", state_validity_cost_weight_,
-			1.0);
+                      1.0);
 	node_handle.param("endeffector_velocity_cost_weight",
-			endeffector_velocity_cost_weight_, 0.0);
+                      endeffector_velocity_cost_weight_, 0.0);
 	node_handle.param("contact_invariant_cost_weight",
-			contact_invariant_cost_weight_, 1.0);
+                      contact_invariant_cost_weight_, 1.0);
 	node_handle.param("physics_violation_cost_weight",
-			physics_violation_cost_weight_, 1.0);
+                      physics_violation_cost_weight_, 1.0);
 	node_handle.param("goal_pose_cost_weight", goal_pose_cost_weight_, 1.0);
 	node_handle.param("CoM_cost_weight", com_cost_weight_, 1.0);
 	node_handle.param("FTR_cost_weight", ftr_cost_weight_, 1.0);
 	node_handle.param("cartesian_trajectory_cost_weight",
-			cartesian_trajectory_cost_weight_, 1.0);
+                      cartesian_trajectory_cost_weight_, 1.0);
 	node_handle.param("singularity_cost_weight", singularity_cost_weight_, 1.0);
 
 	node_handle.param("smoothness_cost_velocity", smoothness_cost_velocity_,
-			0.0);
+                      0.0);
 	node_handle.param("smoothness_cost_acceleration",
-			smoothness_cost_acceleration_, 1.0);
+                      smoothness_cost_acceleration_, 1.0);
 	node_handle.param("smoothness_cost_jerk", smoothness_cost_jerk_, 0.0);
 	node_handle.param("ridge_factor", ridge_factor_, 0.0);
 
@@ -116,19 +116,19 @@ void PlanningParameters::initFromNodeHandle()
 					{
 						std::string endeffector = it->second;
 						animate_endeffector_segment_.insert(
-								std::make_pair<std::string, std::string>(
-										component, endeffector));
+                            std::make_pair<std::string, std::string>(
+                                component, endeffector));
 					}
 					else if (it->second.getType()
-							== XmlRpc::XmlRpcValue::TypeArray)
+                             == XmlRpc::XmlRpcValue::TypeArray)
 					{
 						int size = it->second.size();
 						for (int i = 0; i < size; ++i)
 						{
 							std::string endeffector = it->second[i];
 							animate_endeffector_segment_.insert(
-									std::make_pair<std::string, std::string>(
-											component, endeffector));
+                                std::make_pair<std::string, std::string>(
+                                    component, endeffector));
 						}
 					}
 				}
@@ -139,7 +139,7 @@ void PlanningParameters::initFromNodeHandle()
 	node_handle.param("phase_duration", phase_duration_, 0.25);
 	node_handle.param("friction_coefficient", friction_coefficient_, 2.0);
 	node_handle.param<std::string>("lower_body_root", lower_body_root_,
-			"pelvis_link");
+                                   "pelvis_link");
 
 	temporary_variables_.clear();
 	if (node_handle.hasParam("temp"))
@@ -246,19 +246,20 @@ void PlanningParameters::initFromNodeHandle()
 
 	node_handle.param("has_root_6d", has_root_6d_, true);
 
+    node_handle.param("use_precomputation", use_precomputation_, true);
 	node_handle.param("precomputation_init_milestones",
-			precomputation_init_milestones_, 1000);
+                      precomputation_init_milestones_, 1000);
 	node_handle.param("precomputation_add_milestones",
-			precomputation_add_milestones_, 1000);
+                      precomputation_add_milestones_, 1000);
 	node_handle.param("precomputation_grow_milestones",
-			precomputation_grow_milestones_, 100);
+                      precomputation_grow_milestones_, 100);
 	node_handle.param("precomputation_expand_milestones",
-			precomputation_expand_milestones_, 400);
+                      precomputation_expand_milestones_, 400);
 	node_handle.param("precomputation_nn", precomputation_nn_, 10);
 	node_handle.param("precomputation_max_valid_segment_dist",
-			precomputation_max_valid_segment_dist_, 0.3);
+                      precomputation_max_valid_segment_dist_, 0.3);
 	node_handle.param("draw_precomputation",
-			draw_precomputation_, true);
+                      draw_precomputation_, true);
 }
 
 } // namespace

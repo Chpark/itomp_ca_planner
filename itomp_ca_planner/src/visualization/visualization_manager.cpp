@@ -58,7 +58,7 @@ VisualizationManager::~VisualizationManager()
 void VisualizationManager::render()
 {
 	//renderGround();
-	renderEnvironment();
+    //renderEnvironment();
 
 }
 

@@ -131,6 +131,7 @@ public:
 	double getEnvironmentModelScale() const;
 	bool getHasRoot6d() const;
 
+        bool getUsePrecomputation() const;
 	int getPrecomputationInitMilestones();
 	int getPrecomputationAddMilestones();
 	int getPrecomputationGrowMilestones();
@@ -198,6 +199,7 @@ private:
 
 	bool has_root_6d_;
 
+        bool use_precomputation_;
 	int precomputation_init_milestones_;
 	int precomputation_add_milestones_;
 	int precomputation_grow_milestones_;
@@ -430,6 +432,10 @@ inline bool PlanningParameters::getHasRoot6d() const
 	return has_root_6d_;
 }
 
+inline bool PlanningParameters::getUsePrecomputation() const
+{
+    return use_precomputation_;
+}
 inline int PlanningParameters::getPrecomputationInitMilestones()
 {
 	return precomputation_init_milestones_;
