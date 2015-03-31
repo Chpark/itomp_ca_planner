@@ -1,3 +1,40 @@
+/*
+
+License
+
+ITOMP Optimization-based Planner
+Copyright © and trademark ™ 2014 University of North Carolina at Chapel Hill.
+All rights reserved.
+
+Permission to use, copy, modify, and distribute this software and its documentation
+for educational, research, and non-profit purposes, without fee, and without a
+written agreement is hereby granted, provided that the above copyright notice,
+this paragraph, and the following four paragraphs appear in all copies.
+
+This software program and documentation are copyrighted by the University of North
+Carolina at Chapel Hill. The software program and documentation are supplied "as is,"
+without any accompanying services from the University of North Carolina at Chapel
+Hill or the authors. The University of North Carolina at Chapel Hill and the
+authors do not warrant that the operation of the program will be uninterrupted
+or error-free. The end-user understands that the program was developed for research
+purposes and is advised not to rely exclusively on the program for any reason.
+
+IN NO EVENT SHALL THE UNIVERSITY OF NORTH CAROLINA AT CHAPEL HILL OR THE AUTHORS
+BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS
+DOCUMENTATION, EVEN IF THE UNIVERSITY OF NORTH CAROLINA AT CHAPEL HILL OR THE
+AUTHORS HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+THE UNIVERSITY OF NORTH CAROLINA AT CHAPEL HILL AND THE AUTHORS SPECIFICALLY
+DISCLAIM ANY WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE AND ANY STATUTORY WARRANTY
+OF NON-INFRINGEMENT. THE SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND
+THE UNIVERSITY OF NORTH CAROLINA AT CHAPEL HILL AND THE AUTHORS HAVE NO OBLIGATIONS
+TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+
+Any questions or comments should be sent to the author chpark@cs.unc.edu
+
+*/
 #include <itomp_ca_planner/planner/itomp_planner_node.h>
 #include <itomp_ca_planner/model/itomp_planning_group.h>
 #include <itomp_ca_planner/util/planning_parameters.h>
@@ -89,9 +126,11 @@ bool ItompPlannerNode::planKinematicPath(
 	vector<string> planningGroups;
 	getPlanningGroups(planningGroups, req.group_name);
 
-	Precomputation::getInstance()->initialize(planning_scene, robot_model_,
-			req.group_name);
-	Precomputation::getInstance()->createRoadmap();
+    if (PlanningParameters::getInstance()->getUsePrecomputation())
+    {
+        Precomputation::getInstance()->initialize(planning_scene, robot_model_, req.group_name);
+        Precomputation::getInstance()->createRoadmap();
+    }
 
 	int num_trials = PlanningParameters::getInstance()->getNumTrials();
 	//resetPlanningInfo(num_trials, planningGroups.size());
@@ -108,35 +147,35 @@ bool ItompPlannerNode::planKinematicPath(
             *complete_initial_robot_state_.get());
 		// TODO : addGoalStates
 
-		sensor_msgs::JointState jointGoalState;
-		getGoalState(req, jointGoalState);
+        sensor_msgs::JointState jointGoalState;
+        getGoalState(req, jointGoalState);
 
-		planning_start_time_ = ros::Time::now().toSec();
+        planning_start_time_ = ros::Time::now().toSec();
 
-		// for each planning group
-		for (unsigned int i = 0; i != planningGroups.size(); ++i)
-		{
-			const string& groupName = planningGroups[i];
+        // for each planning group
+        for (unsigned int i = 0; i != planningGroups.size(); ++i)
+        {
+            const string& groupName = planningGroups[i];
 
-			VisualizationManager::getInstance()->setPlanningGroup(robot_model_,
-					groupName);
+            VisualizationManager::getInstance()->setPlanningGroup(robot_model_,
+                    groupName);
 
 			// optimize
 			trajectoryOptimization(groupName, jointGoalState,
                                    req.path_constraints, req.trajectory_constraints,
                                    planning_scene);
 
-			writePlanningInfo(c, i);
-		}
+            writePlanningInfo(c, i);
+        }
 	}
-	printPlanningInfoSummary();
+    printPlanningInfoSummary();
 
-	// return trajectory
-	fillInResult(planningGroups, res);
+    // return trajectory
+    fillInResult(planningGroups, res);
 
-	planning_count_ += num_trials;
+    planning_count_ += num_trials;
 
-	return true;
+    return true;
 }
 
 bool ItompPlannerNode::preprocessRequest(
@@ -248,7 +287,11 @@ void ItompPlannerNode::getGoalState(const planning_interface::MotionPlanRequest 
 		robot_state::jointStateToRobotState(goal_joint_states[i],
                                             robot_states[i]);
 	}
-	Precomputation::getInstance()->addGoalStates(robot_states);
+
+    if (PlanningParameters::getInstance()->getUsePrecomputation())
+    {
+        Precomputation::getInstance()->addGoalStates(robot_states);
+    }
 }
 
 void ItompPlannerNode::getPlanningGroups(
@@ -326,8 +369,9 @@ void ItompPlannerNode::fillInResult(
 	int num_all_joints = complete_initial_robot_state_->getVariableCount();
 
 	res.trajectory_.reset(
-        new robot_trajectory::RobotTrajectory(robot_model_.getRobotModel(),
-                ""));
+			new robot_trajectory::RobotTrajectory(robot_model_.getRobotModel(),
+					""));
+	res.trajectory_->setGroupName(planningGroups[0]);
 
 	std::vector<double> velocity_limits(num_all_joints,
                                         std::numeric_limits<double>::max());
@@ -382,13 +426,15 @@ void ItompPlannerNode::fillGroupJointTrajectory(const string& groupName,
 	int num_trajectories =
         PlanningParameters::getInstance()->getNumTrajectories();
 
-	moveit_msgs::TrajectoryConstraints precomputation_trajectory_constraints;
-	Precomputation::getInstance()->extractInitialTrajectories(
-        precomputation_trajectory_constraints);
+    moveit_msgs::TrajectoryConstraints precomputation_trajectory_constraints;
+    if (PlanningParameters::getInstance()->getUsePrecomputation())
+    {
+        Precomputation::getInstance()->extractInitialTrajectories(precomputation_trajectory_constraints);
+    }
 
 	const ItompPlanningGroup* group = robot_model_.getPlanningGroup(groupName);
 	int goal_index = trajectory_->getNumPoints() - 1;
-    Eigen::MatrixXd::RowXpr goalPoint = trajectory_->getTrajectoryPoint(goal_index);
+	Eigen::MatrixXd::RowXpr goalPoint = trajectory_->getTrajectoryPoint(goal_index);
 	for (int i = 0; i < group->num_joints_; ++i)
 	{
 		string name = group->group_joints_[i].joint_name_;

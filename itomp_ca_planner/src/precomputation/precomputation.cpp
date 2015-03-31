@@ -1,9 +1,40 @@
 /*
- * Precomputation.cpp
- *
- *  Created on: Dec 8, 2014
- *      Author: chonhyon
- */
+
+License
+
+ITOMP Optimization-based Planner
+Copyright © and trademark ™ 2014 University of North Carolina at Chapel Hill.
+All rights reserved.
+
+Permission to use, copy, modify, and distribute this software and its documentation
+for educational, research, and non-profit purposes, without fee, and without a
+written agreement is hereby granted, provided that the above copyright notice,
+this paragraph, and the following four paragraphs appear in all copies.
+
+This software program and documentation are copyrighted by the University of North
+Carolina at Chapel Hill. The software program and documentation are supplied "as is,"
+without any accompanying services from the University of North Carolina at Chapel
+Hill or the authors. The University of North Carolina at Chapel Hill and the
+authors do not warrant that the operation of the program will be uninterrupted
+or error-free. The end-user understands that the program was developed for research
+purposes and is advised not to rely exclusively on the program for any reason.
+
+IN NO EVENT SHALL THE UNIVERSITY OF NORTH CAROLINA AT CHAPEL HILL OR THE AUTHORS
+BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS
+DOCUMENTATION, EVEN IF THE UNIVERSITY OF NORTH CAROLINA AT CHAPEL HILL OR THE
+AUTHORS HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+THE UNIVERSITY OF NORTH CAROLINA AT CHAPEL HILL AND THE AUTHORS SPECIFICALLY
+DISCLAIM ANY WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE AND ANY STATUTORY WARRANTY
+OF NON-INFRINGEMENT. THE SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND
+THE UNIVERSITY OF NORTH CAROLINA AT CHAPEL HILL AND THE AUTHORS HAVE NO OBLIGATIONS
+TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+
+Any questions or comments should be sent to the author chpark@cs.unc.edu
+
+*/
 
 #include <itomp_ca_planner/precomputation/precomputation.h>
 #include <moveit/robot_model/robot_model.h>
@@ -14,8 +45,6 @@
 
 namespace itomp_ca_planner
 {
-
-const std::string END_EFFECTOR_NAME = "tcp_1_link";
 flann::SearchParams FLANN_PARAMS;
 
 Precomputation::Precomputation() :
@@ -320,7 +349,7 @@ void Precomputation::createRoadmap(int milestones)
 	while (states_.size() < milestones)
 	{
         growRoadmap(
-          PlanningParameters::getInstance()->getPrecomputationGrowMilestones());
+            PlanningParameters::getInstance()->getPrecomputationGrowMilestones());
 		expandRoadmap(
             PlanningParameters::getInstance()->getPrecomputationExpandMilestones());
 
@@ -720,8 +749,10 @@ double Precomputation::workspaceDistance(const robot_state::RobotState* s1,
 {
     double cost = 0.0;
 
-    const Eigen::Affine3d& transform1 = s1->getGlobalLinkTransform(END_EFFECTOR_NAME);
-    const Eigen::Affine3d& transform2 = s2->getGlobalLinkTransform(END_EFFECTOR_NAME);
+    const std::string end_effector_name = robot_model_->getGroupEndeffectorLinkName(group_name_);
+
+    const Eigen::Affine3d& transform1 = s1->getGlobalLinkTransform(end_effector_name);
+    const Eigen::Affine3d& transform2 = s2->getGlobalLinkTransform(end_effector_name);
 
     const Eigen::Vector3d& translation1 = transform1.translation();
     const Eigen::Vector3d& translation2 = transform2.translation();
@@ -752,6 +783,9 @@ void Precomputation::renderPaths()
 	const double trajectory_color_diff = 0.33;
 	const double scale = 0.005, scale2 = 0.001;
 	const int marker_step = 1;
+
+	const std::string end_effector_name =
+        robot_model_->getGroupEndeffectorLinkName(group_name_);
 
 	visualization_msgs::MarkerArray ma;
 	visualization_msgs::Marker::_color_type RED;
@@ -799,8 +833,7 @@ void Precomputation::renderPaths()
 				from->interpolate(*to, (double) k / (double) nd, test);
 				test.updateLinkTransforms();
 
-				const Eigen::Affine3d& transform = test.getGlobalLinkTransform(
-                                                       "tcp_1_link");
+                const Eigen::Affine3d& transform = test.getGlobalLinkTransform(end_effector_name);
 
 				point.x = transform.translation()(0);
 				point.y = transform.translation()(1);
@@ -810,8 +843,7 @@ void Precomputation::renderPaths()
                 k = nd;
 			}
 
-            const Eigen::Affine3d& transform = to->getGlobalLinkTransform(
-                                                   "tcp_1_link");
+            const Eigen::Affine3d& transform = to->getGlobalLinkTransform(end_effector_name);
 
             point.x = transform.translation()(0);
             point.y = transform.translation()(1);
@@ -839,8 +871,7 @@ void Precomputation::renderPaths()
                 from->interpolate(*to, (double) k / (double) nd, test);
                 test.updateLinkTransforms();
 
-                const Eigen::Affine3d& transform = test.getGlobalLinkTransform(
-                                                       "tcp_1_link");
+                const Eigen::Affine3d& transform = test.getGlobalLinkTransform(end_effector_name);
 
                 point.x = transform.translation()(0);
                 point.y = transform.translation()(1);
@@ -865,6 +896,9 @@ void Precomputation::renderPRMGraph()
 	const double trajectory_color_diff = 0.33;
 	const double scale = 0.005, scale2 = 0.001;
 	const int marker_step = 1;
+
+	const std::string end_effector_name =
+        robot_model_->getGroupEndeffectorLinkName(group_name_);
 
 	visualization_msgs::MarkerArray ma;
 	visualization_msgs::Marker::_color_type BLUE, GREEN, LIGHT_YELLOW;
@@ -901,7 +935,7 @@ void Precomputation::renderPRMGraph()
         msg.points.resize(0);
 
 		const Eigen::Affine3d& transform =
-            stateProperty_[v]->getGlobalLinkTransform("tcp_1_link");
+            stateProperty_[v]->getGlobalLinkTransform(end_effector_name);
 		point.x = transform.translation()(0);
 		point.y = transform.translation()(1);
 		point.z = transform.translation()(2);
@@ -929,7 +963,7 @@ void Precomputation::renderPRMGraph()
 		const Vertex v = boost::target(e, g_);
 
 		const Eigen::Affine3d& transform =
-            stateProperty_[u]->getGlobalLinkTransform("tcp_1_link");
+            stateProperty_[u]->getGlobalLinkTransform(end_effector_name);
 
 		point.x = transform.translation()(0);
 		point.y = transform.translation()(1);
@@ -937,7 +971,7 @@ void Precomputation::renderPRMGraph()
 		msg.points.push_back(point);
 
 		const Eigen::Affine3d& transform2 =
-            stateProperty_[v]->getGlobalLinkTransform("tcp_1_link");
+            stateProperty_[v]->getGlobalLinkTransform(end_effector_name);
 		point.x = transform2.translation()(0);
 		point.y = transform2.translation()(1);
 		point.z = transform2.translation()(2);

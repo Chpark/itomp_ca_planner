@@ -1,0 +1,37 @@
+<launch>
+	<!-- Debug Info -->
+	<arg name="debug" default="false" />
+	<arg unless="$(arg debug)" name="launch_prefix" value="" />
+	<arg if="$(arg debug)" name="launch_prefix" value="gdb --ex run --args" />
+	
+	<include file="$(find baxter_moveit_config)/launch/planning_context.launch">
+		<arg name="load_robot_description" value="true"/>
+	</include>
+
+  	<node pkg="tf" type="static_transform_publisher" name="virtual_joint_broadcaster_0" args="0 0 0 0 0 0 odom_combined base 100" />
+
+  	<node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
+    		<param name="/use_gui" value="false"/>
+  	</node>
+
+	<node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" respawn="true" output="screen" />
+
+  	<include file="$(find baxter_moveit_config)/launch/move_group.launch">
+    		<arg name="allow_trajectory_execution" value="true"/>
+    		<arg name="info" value="true"/>
+    		<arg name="debug" value="$(arg debug)"/>
+  	</include>
+
+	<include file="$(find baxter_moveit_config)/launch/moveit_rviz.launch">
+		<arg name="config" value="true"/>
+    		<arg name="debug" value="$(arg debug)"/>
+	</include>
+
+        <rosparam command="load" file="$(find move_baxter)/config/params_baxter.yaml" ns="/itomp_planner"/>
+
+	<rosparam command="load" file="$(find baxter_moveit_config)/config/kinematics.yaml" ns="move_itomp"/>
+
+	<node name="move_baxter_node" pkg="move_baxter" type="move_baxter" respawn="false" launch-prefix="$(arg launch_prefix)" output="screen">
+		<param name="/planning_plugin" value="itomp_ca_planner/ItompPlanner"/>
+	</node>
+</launch>
