@@ -20,12 +20,12 @@
     <arg name="debug" value="$(arg debug)"/>
   </include>
 
-
-  <rosparam command="load" file="$(find itomp_ca_planner)/config/params_kuka.yaml" ns="itomp_planner"/>
+  <rosparam command="load" file="$(find itomp_ca_planner)/config/params_kuka_2.yaml" ns="itomp_planner"/>
   <rosparam command="load" file="$(find lbr3_moveit_generated)/config/kinematics.yaml" ns="move_itomp"/>
-<!--  <param name="/move_itomp/planning_plugin" value="itomp_ca_planner/ItompPlanner"/>-->
-  <param name="/move_itomp/planning_plugin" value="ompl_interface/OMPLPlanner"/>
-  <rosparam command="load" file="$(find lbr3_moveit_generated)/config/ompl_planning.yaml" ns="move_itomp" />
+  <param name="/move_itomp/planning_plugin" value="itomp_ca_planner/ItompPlanner"/>
+  <rosparam command="load" file="$(find lbr3_moveit_generated)/config/ompl_planning.yaml" />
+
+
 
 <!--
   <node name="move_itomp" pkg="move_itomp" type="move_itomp" respawn="false" output="screen">

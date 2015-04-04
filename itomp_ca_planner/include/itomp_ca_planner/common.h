@@ -61,8 +61,8 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 
 inline int getNumParallelThreads()
 {
-	//return omp_get_max_threads();
-	return 1;
+        return omp_get_max_threads();
+        //return 1;
 }
 
 #endif

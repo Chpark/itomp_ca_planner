@@ -27,6 +27,8 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 #set the default path for built libraries to the "lib" directory
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
+file(GLOB_RECURSE ITOMP_HEADER_FILES RELATIVE ${PROJECT_SOURCE_DIR} *.h)
+
 rosbuild_add_library(itomp_ca
 src/planner/itomp_planner_node.cpp
 src/model/itomp_robot_model.cpp
@@ -51,6 +53,7 @@ src/optimization/improvement_manager.cpp
 src/optimization/improvement_manager_chomp.cpp
 src/optimization/rollout.cpp
 src/precomputation/precomputation.cpp
+${ITOMP_HEADER_FILES}
 )
 set(LIBRARY_INPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 

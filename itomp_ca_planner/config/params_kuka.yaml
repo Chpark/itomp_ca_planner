@@ -1,19 +1,19 @@
 num_trials: 1
 planning_time_limit: 120.0
-max_iterations: 0
-max_iterations_after_collision_free: 0
+max_iterations: 2000
+max_iterations_after_collision_free: 100
 num_trajectories: 1
 
-precomputation_init_milestones: 0
-precomputation_add_milestones: 500
-precomputation_grow_milestones: 100
-precomputation_expand_milestones: 400
+precomputation_init_milestones: 5000
+precomputation_add_milestones: 5000
+precomputation_grow_milestones: 1000
+precomputation_expand_milestones: 4000
 precomputation_nn: 10
 precomputation_max_valid_segment_dist: 0.3
 draw_precomputation: true
 
 smoothness_cost_weight: 0.00001
-obstacle_cost_weight: 1.0
+obstacle_cost_weight: 0.0
 torque_cost_weight: 0.0
 state_validity_cost_weight: 0.0
 endeffector_velocity_cost_weight: 0.0
@@ -22,10 +22,10 @@ physics_violation_cost_weight: 0.0
 goal_pose_cost_weight: 0.0
 CoM_cost_weight: 0.0
 FTR_cost_weight: 0.0
-cartesian_trajectory_cost_weight: 0.0
-singularity_cost_weight: 1.0
-smoothness_cost_velocity: 0.0
-smoothness_cost_acceleration: 1.0
+cartesian_trajectory_cost_weight: 1.0
+singularity_cost_weight: 0.0
+smoothness_cost_velocity: 10.0
+smoothness_cost_acceleration: 0.01
 smoothness_cost_jerk: 0.0
 ridge_factor: 0.0
 

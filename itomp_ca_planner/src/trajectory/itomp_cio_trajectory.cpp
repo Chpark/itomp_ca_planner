@@ -193,7 +193,7 @@ void ItompCIOTrajectory::init()
 		contact_start_points_.push_back(i);
 	}
 	contact_start_points_.push_back(end_index_ + 1);
-	ROS_ASSERT(contact_start_points_.size() == num_contact_phases_);
+    //ROS_ASSERT(contact_start_points_.size() == num_contact_phases_);
 }
 
 void ItompCIOTrajectory::updateFromGroupTrajectory(
@@ -600,30 +600,37 @@ void ItompCIOTrajectory::fillInMinJerk(int trajectory_index,
 
 			ecl::QuinticPolynomial poly;
             poly = ecl::QuinticPolynomial::Interpolation(0, x0, v0, a0, duration_, x1, v1, a1);
-			for (int i = 1; i < getNumPoints() - 1; ++i)
+            for (int i = 1; i < getNumPoints(); ++i)
 			{
 				(*this)(i, j) = poly(i * discretization_);
 			}
 		}
 		else
 		{
-			ecl::CubicSpline cubic;
+            ecl::SmoothLinearSpline spline;
+            //ecl::CubicSpline cubic;
 			ecl::Array<double> array_x(num_constraint_points);
 			ecl::Array<double> array_y(num_constraint_points);
+            //printf("Joint %d\n", j);
 			for (int k = 0; k < num_constraint_points; ++k)
 			{
 				int point = k + traj_constraint_begin;
 
                 array_x[k] = accumulated_distances[k];
                 array_y[k] = trajectory_constraints.constraints[point].joint_constraints[constraint_index].position;
+                //printf("%f : %f\n", array_x[k], array_y[k]);
 			}
-			cubic = ecl::CubicSpline::Natural(array_x, array_y);
-			for (int i = 0; i < getNumPoints() - 1; ++i)
+            //printf("\n");
+            //cubic = ecl::CubicSpline::Natural(array_x, array_y);
+            spline = ecl::SmoothLinearSpline(array_x, array_y, 50.0);
+            for (int i = 0; i < getNumPoints(); ++i)
 			{
                 double x = (double)i / (getNumPoints() - 1) * accumulated_distances.back();
-				double value = cubic(x);
+                //double value = cubic(x);
+                double value = spline(x);
 				(*this)(i, j) = value;
 			}
+            //printf("Joint %d...done\n", j);
 		}
 		++group_joint_index;
 	}

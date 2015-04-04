@@ -50,6 +50,14 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 namespace itomp_ca_planner
 {
 
+template<typename _Matrix_Type_>
+_Matrix_Type_ pseudoInverse(const _Matrix_Type_ &a, double epsilon = std::numeric_limits<double>::epsilon())
+{
+        Eigen::JacobiSVD< _Matrix_Type_ > svd(a ,Eigen::ComputeThinU | Eigen::ComputeThinV);
+        double tolerance = epsilon * std::max(a.cols(), a.rows()) * svd.singularValues().array().abs()(0);
+        return svd.matrixV() *  (svd.singularValues().array().abs() > tolerance).select(svd.singularValues().array().inverse(), 0).matrix().asDiagonal() * svd.matrixU().adjoint();
+}
+
 class ItompPlannerNode
 {
 public:
@@ -61,30 +69,27 @@ public:
 	int run();
 
 	bool planKinematicPath(
-			const planning_scene::PlanningSceneConstPtr& planning_scene,
-			const planning_interface::MotionPlanRequest &req,
-			planning_interface::MotionPlanResponse &res);
+                const planning_scene::PlanningSceneConstPtr& planning_scene,
+                const planning_interface::MotionPlanRequest &req,
+                planning_interface::MotionPlanResponse &res);
 
 private:
 	bool preprocessRequest(const planning_interface::MotionPlanRequest &req);
 	void getGoalState(const planning_interface::MotionPlanRequest &req,
-			sensor_msgs::JointState& goalState);
+                                          sensor_msgs::JointState& goalState);
 	void initTrajectory(const sensor_msgs::JointState &joint_state);
 	void getPlanningGroups(std::vector<std::string>& plannningGroups,
-			const std::string& groupName);
-	void fillGroupJointTrajectory(const std::string& groupName,
-			const sensor_msgs::JointState& jointGoalState,
-			const moveit_msgs::Constraints& path_constraints,
-			const moveit_msgs::TrajectoryConstraints& trajectory_constraints);
+                                                   const std::string& groupName);
+        void fillGroupJointTrajectory(const std::string& groupName,
+                                                                  const planning_interface::MotionPlanRequest &req,
+                                                                  const planning_scene::PlanningSceneConstPtr& planning_scene);
 	void trajectoryOptimization(const std::string& groupName,
-			const sensor_msgs::JointState& jointGoalState,
-			const moveit_msgs::Constraints& path_constraints,
-			const moveit_msgs::TrajectoryConstraints& trajectory_constraints,
-			const planning_scene::PlanningSceneConstPtr& planning_scene);
+                                                                const planning_interface::MotionPlanRequest& req,
+                                                                const planning_scene::PlanningSceneConstPtr& planning_scene);
 
 	void
 	fillInResult(const std::vector<std::string>& planningGroups,
-			planning_interface::MotionPlanResponse &res);
+                                 planning_interface::MotionPlanResponse &res);
 
 	ItompRobotModel robot_model_;
 
@@ -112,9 +117,8 @@ private:
 
 	BestCostManager best_cost_manager_;
 
-	void jointConstraintsToJointState(
-			const std::vector<moveit_msgs::Constraints> &constraints,
-			std::vector<sensor_msgs::JointState>& joint_states)
+        void jointConstraintsToJointState(const std::vector<moveit_msgs::Constraints> &constraints,
+                                                                          std::vector<sensor_msgs::JointState>& joint_states)
 	{
 		joint_states.clear();
 
@@ -124,8 +128,7 @@ private:
 			state.name.clear();
 			state.position.clear();
 
-			const std::vector<moveit_msgs::JointConstraint> &joint_constraints =
-					constraints[i].joint_constraints;
+                        const std::vector<moveit_msgs::JointConstraint> &joint_constraints = constraints[i].joint_constraints;
 
 			for (unsigned int j = 0; j < joint_constraints.size(); j++)
 			{
@@ -135,6 +138,11 @@ private:
 			joint_states.push_back(state);
 		}
 	}
+
+        // TODO: move
+        bool collisionAwareIK(robot_state::RobotState& robot_state, const Eigen::Affine3d& transform,
+                                                  const std::string& group_name, const std::string& link_name,
+                                                  const planning_scene::PlanningSceneConstPtr& planning_scene) const;
 };
 
 }
