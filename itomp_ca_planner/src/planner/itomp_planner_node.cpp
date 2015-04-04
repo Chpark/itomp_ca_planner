@@ -49,6 +49,7 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_state/robot_state.h>
 #include <moveit/robot_state/conversions.h>
+#include <Eigen/Geometry>
 
 using namespace std;
 
@@ -105,6 +106,9 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
         const planning_interface::MotionPlanRequest &req,
         planning_interface::MotionPlanResponse &res)
 {
+    if (req.planner_id == "ITOMP_3steps")
+        return plan3StepPath(planning_scene, req, res);
+
 	// reload parameters
 	PlanningParameters::getInstance()->initFromNodeHandle();
 
@@ -158,6 +162,97 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
     fillInResult(planningGroups, res);
 
     planning_count_ += num_trials;
+
+    return true;
+}
+
+bool ItompPlannerNode::plan3StepPath(const planning_scene::PlanningSceneConstPtr& planning_scene,
+                                     const planning_interface::MotionPlanRequest &req,
+                                     planning_interface::MotionPlanResponse &res)
+{
+    // reload parameters
+    PlanningParameters::getInstance()->initFromNodeHandle();
+
+    if (!preprocessRequest(req))
+        return false;
+
+    Precomputation::getInstance()->initialize(planning_scene, robot_model_, req.group_name);
+    Precomputation::getInstance()->createRoadmap();
+
+    complete_initial_robot_state_ = planning_scene->getCurrentStateUpdated(req.start_state);
+    Precomputation::getInstance()->addStartState(*complete_initial_robot_state_.get());
+
+    robot_state::RobotStatePtr start_states[3];
+    robot_state::RobotStatePtr goal_states[3];
+
+    for (int i = 0; i < 3; ++i)
+    {
+        start_states[i].reset(new robot_state::RobotState(*complete_initial_robot_state_));
+        goal_states[i].reset(new robot_state::RobotState(*complete_initial_robot_state_));
+    }
+
+    robot_state::robotStateMsgToRobotState(req.start_state, *start_states[0]);
+
+    sensor_msgs::JointState joint_goal_state;
+    getGoalState(req, joint_goal_state);
+    for (int i = 0; i < joint_goal_state.name.size(); ++i)
+        goal_states[2]->setVariablePosition(joint_goal_state.name[i], joint_goal_state.position[i]);
+
+    robot_state::JointModelGroup* jmg = robot_model_.getRobotModel()->getJointModelGroup(req.group_name);
+    const std::string ee_name = robot_model_.getGroupEndeffectorLinkName(req.group_name);
+
+    start_states[0]->update(true);
+    goal_states[2]->update(true);
+
+    const Eigen::Affine3d& transform_start = start_states[0]->getFrameTransform(ee_name);
+    const Eigen::Affine3d& transform_goal = goal_states[2]->getFrameTransform(ee_name);
+
+    Eigen::Affine3d transform_start_shifted = transform_start;
+    Eigen::Affine3d transform_goal_shifted = transform_goal;
+
+    const double offset = 0.1;
+
+    // shift by -x
+    for (int i = 0; i < 3; ++i)
+    {
+        transform_start_shifted(i, 3) -= offset * transform_start_shifted(i, 0);
+        transform_goal_shifted(i, 3) -= offset * transform_goal_shifted(i, 0);
+    }
+
+    kinematics::KinematicsQueryOptions options;
+    options.return_approximate_solution = false;
+
+    *goal_states[0] = *start_states[0];
+    *start_states[2] = *goal_states[2];
+    if (!goal_states[0]->setFromIK(jmg, transform_start_shifted, ee_name, 10, 1.0, moveit::core::GroupStateValidityCallbackFn(), options))
+        return false;
+    if (!start_states[2]->setFromIK(jmg, transform_goal_shifted, ee_name, 10, 1.0, moveit::core::GroupStateValidityCallbackFn(), options))
+        return false;
+
+    goal_states[0]->update(true);
+    start_states[2]->update(true);
+
+    *start_states[1] = *goal_states[0];
+    *goal_states[1] = *start_states[2];
+
+    planning_start_time_ = ros::Time::now().toSec();
+    VisualizationManager::getInstance()->setPlanningGroup(robot_model_, req.group_name);
+
+    std::vector<std::string> planning_groups;
+    planning_groups.push_back(req.group_name);
+
+    double total_duration = PlanningParameters::getInstance()->getTrajectoryDuration();
+    for (int i = 0; i < 3; ++i)
+    {
+        double duration = (i == 1) ? total_duration - 1.0 : 0.5;
+        PlanningParameters::getInstance()->setTrajectoryDuration(duration);
+        initTrajectory(start_states[i], duration);
+
+        trajectoryOptimization(req.group_name, req, planning_scene, goal_states[i]);
+
+        fillInResult(planning_groups, res, i > 0);
+    }
+    PlanningParameters::getInstance()->setTrajectoryDuration(total_duration);
 
     return true;
 }
@@ -227,6 +322,34 @@ void ItompPlannerNode::initTrajectory(const sensor_msgs::JointState &joint_state
 	{
 		trajectory_->getContactTrajectoryPoint(i) = initContacts;
 	}
+}
+
+void ItompPlannerNode::initTrajectory(const robot_state::RobotStatePtr& start_state, double duration)
+{
+    if (trajectory_->getDuration() != duration)
+    {
+        double trajectory_discretization = PlanningParameters::getInstance()->getTrajectoryDiscretization();
+
+        trajectory_.reset(new ItompCIOTrajectory(&robot_model_, duration,
+                          trajectory_discretization,
+                          PlanningParameters::getInstance()->getNumContacts(),
+                          PlanningParameters::getInstance()->getPhaseDuration()));
+    }
+
+    // set the trajectory to initial state value
+    start_point_velocities_ = Eigen::MatrixXd(1, robot_model_.getNumKDLJoints());
+    start_point_accelerations_ = Eigen::MatrixXd(1, robot_model_.getNumKDLJoints());
+
+    for (int i = 0; i < start_state->getVariableCount(); ++i)
+    {
+        (*trajectory_)(0, i) = start_state->getVariablePositions()[i];
+        start_point_velocities_(0, i) = start_state->getVariableVelocities()[i];
+        start_point_accelerations_(0, i) = start_state->getVariableAccelerations()[i];
+    }
+    for (int i = 1; i < trajectory_->getNumPoints(); ++i)
+    {
+        trajectory_->getTrajectoryPoint(i) = trajectory_->getTrajectoryPoint(0);
+    }
 }
 
 void ItompPlannerNode::getGoalState(const planning_interface::MotionPlanRequest &req, sensor_msgs::JointState& goalState)
@@ -308,8 +431,40 @@ void ItompPlannerNode::trajectoryOptimization(const string& groupName,
     ROS_INFO("Optimization of group %s took %f sec", groupName.c_str(), last_planning_time_);
 }
 
+void ItompPlannerNode::trajectoryOptimization(const std::string& groupName,
+        const planning_interface::MotionPlanRequest& req,
+        const planning_scene::PlanningSceneConstPtr& planning_scene,
+        const robot_state::RobotStatePtr& goal_state)
+{
+    fillGroupJointTrajectory(groupName, goal_state);
+
+    ros::WallTime create_time = ros::WallTime::now();
+
+    int num_trajectories = PlanningParameters::getInstance()->getNumTrajectories();
+    const ItompPlanningGroup* group = robot_model_.getPlanningGroup(groupName);
+
+    best_cost_manager_.reset();
+
+    optimizers_.resize(num_trajectories);
+    for (int i = 0; i < num_trajectories; ++i)
+        optimizers_[i].reset(new ItompOptimizer(i, trajectories_[i].get(), &robot_model_,
+                                                group, planning_start_time_, trajectory_start_time_,
+                                                req.path_constraints, &best_cost_manager_, planning_scene));
+
+    std::vector<boost::shared_ptr<boost::thread> > optimization_threads(num_trajectories);
+    for (int i = 0; i < num_trajectories; ++i)
+        optimization_threads[i].reset(new boost::thread(optimization_thread_function, optimizers_[i]));
+
+    for (int i = 0; i < num_trajectories; ++i)
+        optimization_threads[i]->join();
+
+    last_planning_time_ = (ros::WallTime::now() - create_time).toSec();
+    ROS_INFO("Optimization of group %s took %f sec", groupName.c_str(), last_planning_time_);
+}
+
 void ItompPlannerNode::fillInResult(const std::vector<std::string>& planningGroups,
-                                    planning_interface::MotionPlanResponse &res)
+                                    planning_interface::MotionPlanResponse &res,
+                                    bool append)
 {
 	int best_trajectory_index = best_cost_manager_.getBestCostTrajectoryIndex();
 
@@ -317,9 +472,11 @@ void ItompPlannerNode::fillInResult(const std::vector<std::string>& planningGrou
 
 	int num_all_joints = complete_initial_robot_state_->getVariableCount();
 
-	res.trajectory_.reset(new robot_trajectory::RobotTrajectory(robot_model_.getRobotModel(), ""));
-	res.trajectory_->setGroupName(planningGroups[0]);
-
+    if (!append)
+    {
+        res.trajectory_.reset(new robot_trajectory::RobotTrajectory(robot_model_.getRobotModel(), ""));
+        res.trajectory_->setGroupName(planningGroups[0]);
+    }
 
     std::vector<double> velocity_limits(num_all_joints, std::numeric_limits<double>::max());
 
@@ -342,7 +499,6 @@ void ItompPlannerNode::fillInResult(const std::vector<std::string>& planningGrou
 	res.error_code_.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
 
 	// print results
-
     if (PlanningParameters::getInstance()->getPrintPlanningInfo())
     {
         const std::vector<std::string>& joint_names = res.trajectory_->getFirstWayPoint().getVariableNames();
@@ -523,6 +679,47 @@ void ItompPlannerNode::fillGroupJointTrajectory(const string& group_name,
                                             start_point_accelerations_.row(0));
 		}
 	}
+}
+
+
+void ItompPlannerNode::fillGroupJointTrajectory(const string& group_name,
+        const robot_state::RobotStatePtr& goal_state)
+{
+    int num_trajectories = PlanningParameters::getInstance()->getNumTrajectories();
+
+    const ItompPlanningGroup* group = robot_model_.getPlanningGroup(group_name);
+    int goal_index = trajectory_->getNumPoints() - 1;
+    Eigen::MatrixXd::RowXpr goalPoint = trajectory_->getTrajectoryPoint(goal_index);
+    for (int i = 0; i < group->num_joints_; ++i)
+    {
+        string name = group->group_joints_[i].joint_name_;
+        int kdl_number = robot_model_.urdfNameToKdlNumber(name);
+        if (kdl_number >= 0)
+        {
+            goalPoint(kdl_number) = goal_state->getVariablePositions()[kdl_number];
+        }
+    }
+
+    std::set<int> groupJointsKDLIndices;
+    for (int i = 0; i < group->num_joints_; ++i)
+    {
+        groupJointsKDLIndices.insert(group->group_joints_[i].kdl_joint_index_);
+    }
+
+    trajectories_.resize(num_trajectories);
+    for (int i = 0; i < num_trajectories; ++i)
+    {
+        trajectories_[i].reset(new ItompCIOTrajectory(&robot_model_,
+                               trajectory_->getDuration(),
+                               trajectory_->getDiscretization(),
+                               PlanningParameters::getInstance()->getNumContacts(),
+                               PlanningParameters::getInstance()->getPhaseDuration()));
+
+        *(trajectories_[i].get()) = *(trajectory_.get());
+        trajectories_[i]->fillInMinJerk(groupJointsKDLIndices,
+                                        start_point_velocities_.row(0),
+                                        start_point_accelerations_.row(0));
+    }
 }
 
 void ItompPlannerNode::resetPlanningInfo(int trials, int component)

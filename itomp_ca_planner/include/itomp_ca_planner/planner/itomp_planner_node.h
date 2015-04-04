@@ -53,9 +53,9 @@ namespace itomp_ca_planner
 template<typename _Matrix_Type_>
 _Matrix_Type_ pseudoInverse(const _Matrix_Type_ &a, double epsilon = std::numeric_limits<double>::epsilon())
 {
-        Eigen::JacobiSVD< _Matrix_Type_ > svd(a ,Eigen::ComputeThinU | Eigen::ComputeThinV);
-        double tolerance = epsilon * std::max(a.cols(), a.rows()) * svd.singularValues().array().abs()(0);
-        return svd.matrixV() *  (svd.singularValues().array().abs() > tolerance).select(svd.singularValues().array().inverse(), 0).matrix().asDiagonal() * svd.matrixU().adjoint();
+    Eigen::JacobiSVD< _Matrix_Type_ > svd(a ,Eigen::ComputeThinU | Eigen::ComputeThinV);
+    double tolerance = epsilon * std::max(a.cols(), a.rows()) * svd.singularValues().array().abs()(0);
+    return svd.matrixV() *  (svd.singularValues().array().abs() > tolerance).select(svd.singularValues().array().inverse(), 0).matrix().asDiagonal() * svd.matrixU().adjoint();
 }
 
 class ItompPlannerNode
@@ -69,27 +69,40 @@ public:
 	int run();
 
 	bool planKinematicPath(
-                const planning_scene::PlanningSceneConstPtr& planning_scene,
-                const planning_interface::MotionPlanRequest &req,
-                planning_interface::MotionPlanResponse &res);
+        const planning_scene::PlanningSceneConstPtr& planning_scene,
+        const planning_interface::MotionPlanRequest &req,
+        planning_interface::MotionPlanResponse &res);
+
+    bool plan3StepPath(
+        const planning_scene::PlanningSceneConstPtr& planning_scene,
+        const planning_interface::MotionPlanRequest &req,
+        planning_interface::MotionPlanResponse &res);
 
 private:
 	bool preprocessRequest(const planning_interface::MotionPlanRequest &req);
 	void getGoalState(const planning_interface::MotionPlanRequest &req,
-                                          sensor_msgs::JointState& goalState);
+                      sensor_msgs::JointState& goalState);
 	void initTrajectory(const sensor_msgs::JointState &joint_state);
+    void initTrajectory(const robot_state::RobotStatePtr& start_state, double duration);
 	void getPlanningGroups(std::vector<std::string>& plannningGroups,
-                                                   const std::string& groupName);
-        void fillGroupJointTrajectory(const std::string& groupName,
-                                                                  const planning_interface::MotionPlanRequest &req,
-                                                                  const planning_scene::PlanningSceneConstPtr& planning_scene);
+                           const std::string& groupName);
+    void fillGroupJointTrajectory(const std::string& groupName,
+                                  const planning_interface::MotionPlanRequest &req,
+                                  const planning_scene::PlanningSceneConstPtr& planning_scene);
+    void fillGroupJointTrajectory(const std::string& groupName,
+                                  const robot_state::RobotStatePtr& goal_state);
 	void trajectoryOptimization(const std::string& groupName,
-                                                                const planning_interface::MotionPlanRequest& req,
-                                                                const planning_scene::PlanningSceneConstPtr& planning_scene);
+                                const planning_interface::MotionPlanRequest& req,
+                                const planning_scene::PlanningSceneConstPtr& planning_scene);
+    void trajectoryOptimization(const std::string& groupName,
+                                const planning_interface::MotionPlanRequest& req,
+                                const planning_scene::PlanningSceneConstPtr& planning_scene,
+                                const robot_state::RobotStatePtr& goal_state);
 
 	void
 	fillInResult(const std::vector<std::string>& planningGroups,
-                                 planning_interface::MotionPlanResponse &res);
+                 planning_interface::MotionPlanResponse &res,
+                 bool append = false);
 
 	ItompRobotModel robot_model_;
 
@@ -117,8 +130,8 @@ private:
 
 	BestCostManager best_cost_manager_;
 
-        void jointConstraintsToJointState(const std::vector<moveit_msgs::Constraints> &constraints,
-                                                                          std::vector<sensor_msgs::JointState>& joint_states)
+    void jointConstraintsToJointState(const std::vector<moveit_msgs::Constraints> &constraints,
+                                      std::vector<sensor_msgs::JointState>& joint_states)
 	{
 		joint_states.clear();
 
@@ -128,7 +141,7 @@ private:
 			state.name.clear();
 			state.position.clear();
 
-                        const std::vector<moveit_msgs::JointConstraint> &joint_constraints = constraints[i].joint_constraints;
+            const std::vector<moveit_msgs::JointConstraint> &joint_constraints = constraints[i].joint_constraints;
 
 			for (unsigned int j = 0; j < joint_constraints.size(); j++)
 			{
@@ -139,10 +152,10 @@ private:
 		}
 	}
 
-        // TODO: move
-        bool collisionAwareIK(robot_state::RobotState& robot_state, const Eigen::Affine3d& transform,
-                                                  const std::string& group_name, const std::string& link_name,
-                                                  const planning_scene::PlanningSceneConstPtr& planning_scene) const;
+    // TODO: move
+    bool collisionAwareIK(robot_state::RobotState& robot_state, const Eigen::Affine3d& transform,
+                          const std::string& group_name, const std::string& link_name,
+                          const planning_scene::PlanningSceneConstPtr& planning_scene) const;
 };
 
 }
