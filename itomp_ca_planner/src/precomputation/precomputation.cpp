@@ -1133,8 +1133,8 @@ bool Precomputation::isDeformable(const Path& from, const Path& to) const
 
     boost::array<std::size_t, 2> lengths = { {n, m} };
     GridGraph grid(lengths);
-    GridVertex start = boost::vertex(0, grid);
-    GridVertex goal = boost::vertex(boost::num_vertices(grid) - 1, grid);
+    GridVertex start = vertex(0, grid);
+    GridVertex goal = vertex(num_vertices(grid) - 1, grid);
 
     boost::unordered_map<GridVertex, double, GridVertexHasher > g_score;
     boost::unordered_map<GridVertex, double, GridVertexHasher > f_score;
@@ -1160,7 +1160,7 @@ bool Precomputation::isDeformable(const Path& from, const Path& to) const
         open_priority_queue.pop();
         closed_set.insert(current);
 
-        BOOST_FOREACH (GridVertex u, boost::adjacent_vertices(current, grid))
+        BOOST_FOREACH (GridVertex u, adjacent_vertices(current, grid))
         {
             if (closed_set.find(u) != closed_set.end())
                 continue;
