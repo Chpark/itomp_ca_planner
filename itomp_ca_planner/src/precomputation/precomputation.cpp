@@ -198,7 +198,7 @@ void Precomputation::computePDR()
             stateProperty_[m] = states_[states_.size() - 1];
 
             cout << "New vertex " << states_.size() - 1 << " : ";
-            for (int k = 0; k < 7; ++k)
+            for (int k = 0; k < robot_model_->getRobotModel()->getJointModelGroup(group_name_)->getVariableCount(); ++k)
                 cout << new_state->getVariablePositions()[k] << " ";
             cout << endl;
 
@@ -278,7 +278,7 @@ void Precomputation::computePDR()
                     else
                     {
                         cout << "New vertex " << new_vertex_index << " : ";
-                        for (int k = 0; k < 7; ++k)
+                        for (int k = 0; k < robot_model_->getRobotModel()->getJointModelGroup(group_name_)->getVariableCount(); ++k)
                             cout << new_state->getVariablePositions()[k] << " ";
                         cout << endl;
                     }
@@ -357,7 +357,7 @@ void Precomputation::computeVizPRM()
                     boost::add_edge(new_vertex_index, i, properties2, g_);
 
                     cout << "New vertex " << new_vertex_index << " : ";
-                    for (int k = 0; k < 7; ++k)
+                    for (int k = 0; k < robot_model_->getRobotModel()->getJointModelGroup(group_name_)->getVariableCount(); ++k)
                         cout << new_state->getVariablePositions()[k] << " ";
                     cout << endl;
 
@@ -377,7 +377,7 @@ void Precomputation::computeVizPRM()
             stateProperty_[m] = states_[states_.size() - 1];
 
             cout << "New vertex " << states_.size() - 1 << " : ";
-            for (int k = 0; k < 7; ++k)
+            for (int k = 0; k < robot_model_->getRobotModel()->getJointModelGroup(group_name_)->getVariableCount(); ++k)
                 cout << new_state->getVariablePositions()[k] << " ";
             cout << endl;
 

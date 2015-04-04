@@ -128,9 +128,6 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
 	{
 		printf("Trial [%d]\n", c);
 
-        // for benchmark
-        Precomputation::getInstance()->reset();
-
         Precomputation::getInstance()->createRoadmap();
 
 		// initialize trajectory with start state
