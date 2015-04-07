@@ -82,16 +82,16 @@ private:
 	bool preprocessRequest(const planning_interface::MotionPlanRequest &req);
 	void getGoalState(const planning_interface::MotionPlanRequest &req,
                       sensor_msgs::JointState& goalState);
-	void initTrajectory(const sensor_msgs::JointState &joint_state);
+    void initTrajectory(const sensor_msgs::JointState &joint_state, const planning_scene::PlanningSceneConstPtr& planning_scene);
     void initTrajectory(const robot_state::RobotStatePtr& start_state, double duration);
 	void getPlanningGroups(std::vector<std::string>& plannningGroups,
                            const std::string& groupName);
-    void fillGroupJointTrajectory(const std::string& groupName,
+    bool fillGroupJointTrajectory(const std::string& groupName,
                                   const planning_interface::MotionPlanRequest &req,
                                   const planning_scene::PlanningSceneConstPtr& planning_scene);
     void fillGroupJointTrajectory(const std::string& groupName,
                                   const robot_state::RobotStatePtr& goal_state);
-	void trajectoryOptimization(const std::string& groupName,
+    bool trajectoryOptimization(const std::string& groupName,
                                 const planning_interface::MotionPlanRequest& req,
                                 const planning_scene::PlanningSceneConstPtr& planning_scene);
     void trajectoryOptimization(const std::string& groupName,

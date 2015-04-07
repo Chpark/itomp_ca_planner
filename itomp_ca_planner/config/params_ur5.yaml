@@ -37,7 +37,7 @@ print_planning_info: false
 animate_path: false
 animate_endeffector: true
 animate_endeffector_segment:
-  ur5: [ee_link]
+  ur5_m2: [ee_link]
 trajectory_duration: 5.0
 trajectory_discretization: 0.05
 phase_duration: 0.5
