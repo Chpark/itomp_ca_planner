@@ -1,0 +1,22 @@
+<package>
+  <description brief="itomp_ompl_wrapper">
+
+     itomp_ompl_wrapper
+
+  </description>
+  <author>Chonhyon Park</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/itomp_ompl_wrapper</url>
+  <depend package="roscpp"/>
+  <depend package="moveit_core"/>
+  <depend package="itomp_ca_planner"/>
+
+  <export>
+    <moveit_core plugin="${prefix}/itomp_ompl_wrapper_plugin_description.xml"/>
+  </export>
+
+
+</package>
+
+

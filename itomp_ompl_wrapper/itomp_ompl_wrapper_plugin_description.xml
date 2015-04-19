@@ -1,0 +1,6 @@
+<library path="lib/libitomp_ompl_wrapper_plugin">
+  <class name="itomp_ompl_wrapper/ItompOmplWrapper" type="itomp_ompl_wrapper::ItompOmplPlannerManager" base_class_type="planning_interface::PlannerManager">
+    <description>
+    </description>
+  </class>
+</library>
