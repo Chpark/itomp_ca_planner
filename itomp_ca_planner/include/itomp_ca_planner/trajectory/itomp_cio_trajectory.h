@@ -65,10 +65,10 @@ public:
 	 * \brief Constructs a trajectory for a given robot model, trajectory duration, and discretization
 	 */
 	ItompCIOTrajectory(const ItompRobotModel* robot_model, double duration,
-			double discretization, double num_contacts,
-			double contact_phase_duration);
+                       double discretization, double num_contacts,
+                       double contact_phase_duration);
 	ItompCIOTrajectory(const ItompCIOTrajectory& source_traj,
-			const ItompPlanningGroup* planning_group, int diff_rule_length);
+                       const ItompPlanningGroup* planning_group, int diff_rule_length);
 	ItompCIOTrajectory() {};
 
 	virtual ~ItompCIOTrajectory();
@@ -81,7 +81,7 @@ public:
 	Eigen::MatrixXd::RowXpr getContactTrajectoryPoint(int phase);
 
 	void getTrajectoryPointKDL(int traj_point,
-			KDL::JntArray& kdl_jnt_array) const;
+                               KDL::JntArray& kdl_jnt_array) const;
 
 	Eigen::MatrixXd::ColXpr getJointTrajectory(int joint);
 	Eigen::MatrixXd::ConstColXpr getJointTrajectory(int joint) const;
@@ -100,20 +100,20 @@ public:
 	 *
 	 */
 	void fillInMinJerk(const std::set<int>& groupJointsKDLIndices,
-			const Eigen::MatrixXd::RowXpr joint_vel_array,
-			const Eigen::MatrixXd::RowXpr joint_acc_array);
+                       const Eigen::MatrixXd::RowXpr joint_vel_array,
+                       const Eigen::MatrixXd::RowXpr joint_acc_array);
 	void fillInMinJerk(int trajectory_index,
-			const std::set<int>& groupJointsKDLIndices,
-			const ItompPlanningGroup* planning_group,
-			const moveit_msgs::TrajectoryConstraints& trajectory_constraints,
-			const Eigen::MatrixXd::RowXpr joint_vel_array,
-			const Eigen::MatrixXd::RowXpr joint_acc_array);
+                       const std::set<int>& groupJointsKDLIndices,
+                       const ItompPlanningGroup* planning_group,
+                       const moveit_msgs::TrajectoryConstraints& trajectory_constraints,
+                       const Eigen::MatrixXd::RowXpr joint_vel_array,
+                       const Eigen::MatrixXd::RowXpr joint_acc_array);
 	void fillInMinJerkCartesianTrajectory(
-			const std::set<int>& groupJointsKDLIndices,
-			const Eigen::MatrixXd::RowXpr joint_vel_array,
-			const Eigen::MatrixXd::RowXpr joint_acc_array,
-			const moveit_msgs::Constraints& path_constraints,
-			const std::string& group_name);
+        const std::set<int>& groupJointsKDLIndices,
+        const Eigen::MatrixXd::RowXpr joint_vel_array,
+        const Eigen::MatrixXd::RowXpr joint_acc_array,
+        const moveit_msgs::Constraints& path_constraints,
+        const std::string& group_name);
 
 	Eigen::MatrixXd& getTrajectory();
 	const Eigen::MatrixXd& getTrajectory() const;
@@ -125,7 +125,7 @@ public:
 
 	void updateFromGroupTrajectory(const ItompCIOTrajectory& group_trajectory);
 	void updateFromGroupTrajectory(const ItompCIOTrajectory& group_trajectory,
-			int point_index, int joint_index);
+                                   int point_index, int joint_index);
 	void copyFromFullTrajectory(const ItompCIOTrajectory& full_trajectory);
 
 	Eigen::MatrixXd& getFreePoints();
@@ -142,13 +142,13 @@ public:
 
 	Eigen::Block<Eigen::MatrixXd, Eigen::Dynamic, Eigen::Dynamic> getFreeTrajectoryBlock();
 	Eigen::Block<Eigen::MatrixXd, Eigen::Dynamic, Eigen::Dynamic> getFreeJointTrajectoryBlock(
-			int joint);
+        int joint);
 	const Eigen::Block<const Eigen::MatrixXd, Eigen::Dynamic, Eigen::Dynamic> getFreeJointTrajectoryBlock(
-			int joint) const;
+        int joint) const;
 	Eigen::Block<Eigen::MatrixXd, Eigen::Dynamic, Eigen::Dynamic> getFreeContactTrajectoryBlock(
-			int contact);
+        int contact);
 	const Eigen::Block<const Eigen::MatrixXd, Eigen::Dynamic, Eigen::Dynamic> getFreeContactTrajectoryBlock(
-			int contact) const;
+        int contact) const;
 
 	// contact functions
 	double getContactValue(int phase, int contact) const;
@@ -211,19 +211,19 @@ inline double ItompCIOTrajectory::getContactValue(int phase, int contact) const
 }
 
 inline Eigen::MatrixXd::RowXpr ItompCIOTrajectory::getTrajectoryPoint(
-		int traj_point)
+    int traj_point)
 {
 	return trajectory_.row(traj_point);
 }
 
 inline const Eigen::MatrixXd::ConstRowXpr ItompCIOTrajectory::getTrajectoryPoint(
-		int traj_point) const
+    int traj_point) const
 {
 	return trajectory_.row(traj_point);
 }
 
 inline Eigen::MatrixXd::RowXpr ItompCIOTrajectory::getContactTrajectoryPoint(
-		int phase)
+    int phase)
 {
 	return contact_trajectory_.row(phase);
 }
@@ -234,7 +234,7 @@ inline Eigen::MatrixXd::ColXpr ItompCIOTrajectory::getJointTrajectory(int joint)
 }
 
 inline Eigen::MatrixXd::ConstColXpr ItompCIOTrajectory::getJointTrajectory(
-		int joint) const
+    int joint) const
 {
 	return trajectory_.col(joint);
 }
@@ -297,7 +297,7 @@ inline const Eigen::MatrixXd& ItompCIOTrajectory::getContactTrajectory() const
 }
 
 inline void ItompCIOTrajectory::setContactTrajectory(
-		Eigen::MatrixXd& contact_trajectory)
+    Eigen::MatrixXd& contact_trajectory)
 {
 	contact_trajectory_ = contact_trajectory;
 }
@@ -312,7 +312,7 @@ inline int ItompCIOTrajectory::getContactPhase(int traj_point) const
 }
 
 inline Eigen::MatrixXd::ColXpr ItompCIOTrajectory::getContactTrajectory(
-		int contact)
+    int contact)
 {
 	return contact_trajectory_.col(contact);
 }
@@ -355,29 +355,29 @@ inline int ItompCIOTrajectory::getNumFreePoints() const
 inline Eigen::Block<Eigen::MatrixXd, Eigen::Dynamic, Eigen::Dynamic> ItompCIOTrajectory::getFreeTrajectoryBlock()
 {
 	return trajectory_.block(start_index_, 0, getNumFreePoints(),
-			getNumJoints());
+                             getNumJoints());
 }
 
 inline Eigen::Block<Eigen::MatrixXd, Eigen::Dynamic, Eigen::Dynamic> ItompCIOTrajectory::getFreeJointTrajectoryBlock(
-		int joint)
+    int joint)
 {
 	return trajectory_.block(start_index_, joint, getNumFreePoints(), 1);
 }
 
 inline const Eigen::Block<const Eigen::MatrixXd, Eigen::Dynamic, Eigen::Dynamic> ItompCIOTrajectory::getFreeJointTrajectoryBlock(
-		int joint) const
+    int joint) const
 {
 	return trajectory_.block(start_index_, joint, getNumFreePoints(), 1);
 }
 
 inline Eigen::Block<Eigen::MatrixXd, Eigen::Dynamic, Eigen::Dynamic> ItompCIOTrajectory::getFreeContactTrajectoryBlock(
-		int contact)
+    int contact)
 {
 	return contact_trajectory_.block(1, contact, getNumContactPhases() - 1, 1);
 }
 
 inline const Eigen::Block<const Eigen::MatrixXd, Eigen::Dynamic, Eigen::Dynamic> ItompCIOTrajectory::getFreeContactTrajectoryBlock(
-		int contact) const
+    int contact) const
 {
 	return contact_trajectory_.block(1, contact, getNumContactPhases() - 1, 1);
 }
