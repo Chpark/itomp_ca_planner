@@ -1,8 +1,8 @@
 num_trials: 1
 planning_time_limit: 120.0
-max_iterations: 500
-max_iterations_after_collision_free: 100
-num_trajectories: 1
+max_iterations: 50
+max_iterations_after_collision_free: 10
+num_trajectories: 4
 
 use_precomputation: false
 precomputation_init_milestones: 0
@@ -13,14 +13,14 @@ precomputation_nn: 10
 precomputation_max_valid_segment_dist: 0.3
 draw_precomputation: true
 
-smoothness_cost_weight: 0.00001
+smoothness_cost_weight: 0.0000
 obstacle_cost_weight: 1.0
 torque_cost_weight: 0.0
 state_validity_cost_weight: 0.0
 endeffector_velocity_cost_weight: 0.0
 contact_invariant_cost_weight: 0.0
 physics_violation_cost_weight: 0.0
-goal_pose_cost_weight: 0.0
+goal_pose_cost_weight: 0.0001
 CoM_cost_weight: 0.0
 FTR_cost_weight: 0.0
 cartesian_trajectory_cost_weight: 1.0
@@ -37,8 +37,8 @@ print_planning_info: false
 animate_path: false
 animate_endeffector: true
 animate_endeffector_segment:
-  ur5_m2: [ee_link]
-trajectory_duration: 5.0
+  ur5_m2: [power_grasp_link]
+trajectory_duration: 1.0
 trajectory_discretization: 0.05
 phase_duration: 0.5
 friction_coefficient: 2.0

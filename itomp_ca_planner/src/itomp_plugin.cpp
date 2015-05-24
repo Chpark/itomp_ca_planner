@@ -75,6 +75,7 @@ public:
 	virtual void getPlanningAlgorithms(std::vector<std::string> &algs) const
 	{
 		algs.push_back("ITOMP");
+        algs.push_back("ITOMP_Workspace");
         algs.push_back("ITOMP_3steps");
 	}
 

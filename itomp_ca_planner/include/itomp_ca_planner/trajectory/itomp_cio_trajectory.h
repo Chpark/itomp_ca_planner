@@ -108,7 +108,7 @@ public:
                        const moveit_msgs::TrajectoryConstraints& trajectory_constraints,
                        const Eigen::MatrixXd::RowXpr joint_vel_array,
                        const Eigen::MatrixXd::RowXpr joint_acc_array);
-	void fillInMinJerkCartesianTrajectory(
+    bool fillInMinJerkCartesianTrajectory(
         const std::set<int>& groupJointsKDLIndices,
         const Eigen::MatrixXd::RowXpr joint_vel_array,
         const Eigen::MatrixXd::RowXpr joint_acc_array,

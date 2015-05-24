@@ -121,7 +121,7 @@ public:
 
 	int getNumTimeSteps() const
 	{
-		return (int) (trajectory_duration_ / trajectory_discretization_) - 1;
+        return (int) (trajectory_duration_ / trajectory_discretization_ + 1e-7) - 1;
 	}
 
 	const std::map<std::string, double>& getJointVelocityLimits() const;

@@ -47,8 +47,32 @@ using namespace std;
 namespace itomp_ca_planner
 {
 
+std::map<int, std_msgs::ColorRGBA> COLOR_MAP;
+enum COLORS
+{
+    BLACK = 0,
+    RED,
+    GREEN,
+    YELLOW,
+    BLUE,
+    MAGENTA,
+    CYAN,
+    WHITE,
+    NUM_COLORS,
+};
+
 VisualizationManager::VisualizationManager()
 {
+    COLOR_MAP.clear();
+    for (int i = 0; i < NUM_COLORS; ++i)
+    {
+        std_msgs::ColorRGBA color;
+        color.a = 1.0;
+        color.r = i % 2;
+        color.g = (i >> 1) % 2;
+        color.b = (i >> 2) % 2;
+        COLOR_MAP[i] = color;
+    }
 }
 
 VisualizationManager::~VisualizationManager()
@@ -598,6 +622,8 @@ void VisualizationManager::setPlanningGroup(
     const itomp_ca_planner::ItompRobotModel& robot_model,
     const std::string& groupName)
 {
+    animate_endeffector_segment_numbers_.clear();
+
 	const multimap<string, string>& endeffectorSegments =
         PlanningParameters::getInstance()->getAnimateEndeffectorSegment();
 
@@ -630,31 +656,20 @@ void VisualizationManager::setPlanningGroup(
 void VisualizationManager::animateEndeffector(int trajectory_index, int point_start, int point_end,
 		const vector<vector<KDL::Frame> >& segmentFrames, bool best)
 {
-	const double trajectory_color_diff = 0.33;
 	const double scale = 0.005;
     const double scale2 = 0.0025;
 	const int marker_step = 1;
 
-	visualization_msgs::Marker::_color_type YELLOW, LIGHT_YELLOW;
-    visualization_msgs::Marker::_color_type ORANGE, LIGHT_ORANGE;
+    visualization_msgs::Marker::_color_type ORANGE;
     ORANGE.a = 1.0;
     ORANGE.r = 1.0;
     ORANGE.g = 0.6;
     ORANGE.b = 0.0;
-	YELLOW.a = 1.0;
-	YELLOW.r = 1.0;
-	YELLOW.g = 1.0;
-	YELLOW.b = 0.0;
-    LIGHT_ORANGE = ORANGE;
-    LIGHT_ORANGE.g = 0.8;
-    LIGHT_ORANGE.b = 0.5;
-	LIGHT_YELLOW = YELLOW;
-	LIGHT_YELLOW.b = 0.5;
 
     visualization_msgs::Marker msg, msg2;
 	msg.header.frame_id = reference_frame_;
 	msg.header.stamp = ros::Time::now();
-	msg.ns = best ? "itomp_best_endeffector" : "itomp_endeffector";
+    msg.ns = "itomp_endeffector";
 	msg.type = visualization_msgs::Marker::SPHERE_LIST;
 	msg.action = visualization_msgs::Marker::ADD;
 
@@ -665,29 +680,39 @@ void VisualizationManager::animateEndeffector(int trajectory_index, int point_st
 	msg.points.resize(0);
 
     msg2 = msg;
-    msg2.ns = best ? "itomp_best_endeffector_path" : "itomp_endeffector_path";
+    msg2.ns = "itomp_endeffector_path";
     msg2.type = visualization_msgs::Marker::LINE_STRIP;
     msg2.scale.x = msg2.scale.y = msg2.scale.z = scale2;
+
+    //msg2.color = msg.color = ORANGE;
+    msg2.color = msg.color = COLOR_MAP[trajectory_index];
+
+    visualization_msgs::Marker msg_best, msg2_best;
+    if (best)
+    {
+        msg_best = msg;
+        msg2_best = msg2;
+        msg_best.ns = "itomp_best_endeffector";
+        msg2_best.ns = "itomp_best_endeffector_path";
+
+        msg_best.scale.x *= 1.2;
+        msg_best.scale.y *= 1.2;
+        msg_best.scale.z *= 1.2;
+
+        msg2_best.scale.x *= 1.2;
+        msg2_best.scale.y *= 1.2;
+        msg2_best.scale.z *= 1.2;
+
+        msg2_best.color = msg_best.color = COLOR_MAP[YELLOW];
+    }
 
     for (unsigned int index = 0; index < animate_endeffector_segment_numbers_.size(); ++index)
 	{
 		if (index != 0)
 			break;
 
-        if (best)
-        {
-            msg.id = index;
-            msg2.id = index;
-
-            msg2.color = msg.color = (index == 0 ? YELLOW : LIGHT_YELLOW);
-        }
-        else
-        {
-            msg.id = trajectory_index * animate_endeffector_segment_numbers_.size() + index;
-            msg2.id = msg.id;
-
-            msg2.color = msg.color = (index == 0 ? ORANGE : LIGHT_ORANGE);
-        }
+        msg.id = trajectory_index * animate_endeffector_segment_numbers_.size() + index;
+        msg2.id = msg.id;
 
 		int sn = animate_endeffector_segment_numbers_[index];
 		if (sn <= 0)
@@ -704,6 +729,17 @@ void VisualizationManager::animateEndeffector(int trajectory_index, int point_st
 		}
 		publish(msg);
         publish(msg2);
+
+        if (best)
+        {
+            msg_best.id = index;
+            msg2_best.id = index;
+
+            msg_best.points = msg.points;
+            msg2_best.points = msg2.points;
+            publish(msg_best);
+            publish(msg2_best);
+        }
 	}
 }
 

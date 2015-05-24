@@ -63,7 +63,7 @@ public:
 
 	bool isFeasible() const;
 
-	void print(int number) const;
+    void print(int trajectory_index, int number) const;
 
 protected:
 	std::map<TrajectoryCost::COST_TYPE, TrajectoryCostPtr> costMap_;

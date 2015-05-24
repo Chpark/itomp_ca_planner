@@ -156,6 +156,12 @@ private:
     bool collisionAwareIK(robot_state::RobotState& robot_state, const Eigen::Affine3d& transform,
                           const std::string& group_name, const std::string& link_name,
                           const planning_scene::PlanningSceneConstPtr& planning_scene) const;
+    bool use_workspace_initial_trajectory_;
+
+    bool computeIKSolutions(const robot_state::RobotState& robot_state, const Eigen::Affine3d& transform,
+                            const std::string& group_name, const std::string& link_name,
+                            const planning_scene::PlanningSceneConstPtr& planning_scene,
+                            std::vector<robot_state::RobotState>& ik_solution_states) const;
 };
 
 }

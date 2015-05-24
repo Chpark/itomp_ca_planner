@@ -103,7 +103,7 @@ bool ItompOptimizer::optimize()
 	evaluation_manager_.updateFullTrajectory();
 	evaluation_manager_.evaluate();
 
-	updateBestTrajectory(evaluation_manager_.getTrajectoryCost(true));
+    updateBestTrajectory(evaluation_manager_.getTrajectoryCost(trajectory_index_, true));
 	++iteration_;
 
 	int iteration_after_solution = 0;
@@ -113,11 +113,14 @@ bool ItompOptimizer::optimize()
 		while (iteration_ < num_iterations)
 		{
 
+
             if (best_cost_manager_->isSolutionFound())
 			{
-                break;
-			}
+                ++iteration_after_solution;
 
+                 if (iteration_after_solution > PlanningParameters::getInstance()->getMaxIterationsAfterCollisionFree())
+                    break;
+			}
 
             double start = ros::Time::now().toSec();
 			improvement_manager_->runSingleIteration(iteration_);
@@ -126,11 +129,12 @@ bool ItompOptimizer::optimize()
 
 
 			is_feasible = evaluation_manager_.isLastTrajectoryFeasible();
-            bool is_updated = updateBestTrajectory(evaluation_manager_.getTrajectoryCost(true));
+            bool is_updated = updateBestTrajectory(evaluation_manager_.getTrajectoryCost(trajectory_index_, true));
 
             bool is_best_trajectory = best_cost_manager_->updateBestCost(trajectory_index_, best_group_trajectory_cost_,
                                       is_feasible);
 
+            /*
 			if (is_feasible)
 			{
 				++iteration_after_solution;
@@ -138,6 +142,7 @@ bool ItompOptimizer::optimize()
                  if (iteration_after_solution > PlanningParameters::getInstance()->getMaxIterationsAfterCollisionFree())
                     break;
 			}
+            */
 
 			if (!is_updated)
 			{
@@ -168,8 +173,8 @@ bool ItompOptimizer::optimize()
     evaluation_manager_.render(trajectory_index_, best_cost_manager_->getBestCostTrajectoryIndex()
                                == trajectory_index_);
 
-    ROS_INFO("Terminated after %d iterations, using path from iteration %d", iteration_, last_improvement_iteration_);
-    ROS_INFO("Optimization core finished in %f sec", (ros::WallTime::now() - start_time).toSec());
+    ROS_INFO("[%d] Terminated after %d iterations, using path from iteration %d", trajectory_index_, iteration_, last_improvement_iteration_);
+    ROS_INFO("[%d] Optimization core finished in %f sec", trajectory_index_, (ros::WallTime::now() - start_time).toSec());
 
 	//evaluation_manager_.getTrajectoryCost(true);
 

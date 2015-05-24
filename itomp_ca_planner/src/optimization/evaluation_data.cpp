@@ -73,7 +73,8 @@ void EvaluationData::initialize(ItompCIOTrajectory *full_trajectory, ItompCIOTra
   planning_scene_ = planning_scene;
   kinematic_state_.resize(getNumParallelThreads());
   for (int i = 0; i < kinematic_state_.size(); ++i)
-	  kinematic_state_[i].reset(new robot_state::RobotState(robot_model->getRobotModel()));
+      kinematic_state_[i].reset(new robot_state::RobotState(planning_scene->getCurrentState()));
+      //kinematic_state_[i].reset(new robot_state::RobotState(robot_model->getRobotModel()));
   //initStaticEnvironment();
 
   kdl_joint_array_.resize(robot_model->getKDLTree()->getNrOfJoints());
@@ -175,7 +176,7 @@ void EvaluationData::initialize(ItompCIOTrajectory *full_trajectory, ItompCIOTra
   costAccumulator_.addCost(TrajectoryCost::CreateTrajectoryCost(TrajectoryCost::COST_VALIDITY));
   costAccumulator_.addCost(TrajectoryCost::CreateTrajectoryCost(TrajectoryCost::COST_CONTACT_INVARIANT));
   costAccumulator_.addCost(TrajectoryCost::CreateTrajectoryCost(TrajectoryCost::COST_PHYSICS_VIOLATION));
-  //costAccumulator_.addCost(TrajectoryCost::CreateTrajectoryCost(TrajectoryCost::COST_GOAL_POSE));
+  costAccumulator_.addCost(TrajectoryCost::CreateTrajectoryCost(TrajectoryCost::COST_GOAL_POSE));
   //costAccumulator_.addCost(TrajectoryCost::CreateTrajectoryCost(TrajectoryCost::COST_COM));
   //costAccumulator_.addCost(TrajectoryCost::CreateTrajectoryCost(TrajectoryCost::COST_FTR));
   costAccumulator_.addCost(TrajectoryCost::CreateTrajectoryCost(TrajectoryCost::COST_CARTESIAN_TRAJECTORY));

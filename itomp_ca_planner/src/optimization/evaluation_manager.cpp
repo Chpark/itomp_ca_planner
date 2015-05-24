@@ -181,7 +181,7 @@ double EvaluationManager::evaluate()
 	// update parameters
 
     UPDATE_TIME
-    //PRINT_TIME(evaluate, 10)
+    PRINT_TIME(evaluate, 10)
 
 	return data_->costAccumulator_.getTrajectoryCost();
 }
@@ -1171,10 +1171,10 @@ void EvaluationManager::computeCartesianTrajectoryCosts()
 	}
 }
 
-double EvaluationManager::getTrajectoryCost(bool verbose)
+double EvaluationManager::getTrajectoryCost(int trajectory_index, bool verbose)
 {
 	if (verbose)
-		data_->costAccumulator_.print(*iteration_);
+        data_->costAccumulator_.print(trajectory_index, *iteration_);
 	return data_->costAccumulator_.getTrajectoryCost();
 }
 

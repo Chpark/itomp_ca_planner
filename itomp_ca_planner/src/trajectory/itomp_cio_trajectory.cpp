@@ -343,8 +343,6 @@ void ItompCIOTrajectory::fillInMinJerk(
     const Eigen::MatrixXd::RowXpr joint_vel_array,
     const Eigen::MatrixXd::RowXpr joint_acc_array)
 {
-	ROS_INFO("Trajectory 0 use fillInMinJerk");
-
 	vel_start_ = joint_vel_array;
 	acc_start_ = joint_acc_array;
 	double start_index = start_index_ - 1;
@@ -525,7 +523,7 @@ void ItompCIOTrajectory::fillInMinJerk(int trajectory_index,
 	//printTrajectory();
 }
 
-void ItompCIOTrajectory::fillInMinJerkCartesianTrajectory(
+bool ItompCIOTrajectory::fillInMinJerkCartesianTrajectory(
     const std::set<int>& groupJointsKDLIndices,
     const Eigen::MatrixXd::RowXpr joint_vel_array,
     const Eigen::MatrixXd::RowXpr joint_acc_array,
@@ -541,8 +539,10 @@ void ItompCIOTrajectory::fillInMinJerkCartesianTrajectory(
         path_constraints.position_constraints[0].target_point_offset;
 	geometry_msgs::Vector3 goal_position =
         path_constraints.position_constraints[1].target_point_offset;
-	geometry_msgs::Quaternion orientation =
+    geometry_msgs::Quaternion start_orientation =
         path_constraints.orientation_constraints[0].orientation;
+    geometry_msgs::Quaternion goal_orientation = (path_constraints.orientation_constraints.size() == 1) ?
+            start_orientation : path_constraints.orientation_constraints[1].orientation;
 
 	vel_start_ = joint_vel_array;
 	acc_start_ = joint_acc_array;
@@ -559,18 +559,11 @@ void ItompCIOTrajectory::fillInMinJerkCartesianTrajectory(
 	kinematic_state->setVariablePositions(&positions[0]);
 	kinematic_state->update();
 
-	double T[6]; // powers of the time duration
-	T[0] = 1.0;
-	T[1] = duration;
-
-	for (int i = 2; i <= 5; i++)
-		T[i] = T[i - 1] * T[1];
-
 	// calculate the spline coefficients for 3d space
-	const int CARTESIAN_SPACE_DOF = 3;
+    const int CARTESIAN_SPACE_DOF = 4;
 	double coeff[CARTESIAN_SPACE_DOF][6];
 
-	for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < CARTESIAN_SPACE_DOF; ++i)
 	{
 		double x0, x1;
 		switch (i)
@@ -587,11 +580,15 @@ void ItompCIOTrajectory::fillInMinJerkCartesianTrajectory(
 			x0 = start_position.z;
 			x1 = goal_position.z;
 			break;
+        case 3:
+            x0 = 0.0;
+            x1 = 1.0;
 		}
 
 		double v0 = 0.0;
 		double a0 = 0.0;
-		ROS_INFO("CartesianSpace %d from %f(%f %f) to %f", i, x0, v0, a0, x1);
+        if (i < 3)
+            ROS_INFO("CartesianSpace %d from %f(%f %f) to %f", i, x0, v0, a0, x1);
 
 		v0 = v0 * duration;
 		a0 = a0 * duration * duration;
@@ -606,7 +603,7 @@ void ItompCIOTrajectory::fillInMinJerkCartesianTrajectory(
 
 	// now evaluate 3d pos for each pos
 	int numPoints = end_index - start_index;
-	for (int i = start_index; i <= end_index; i++)
+    for (int i = start_index; i <= end_index; i++)
 	{
 		double t[6]; // powers of the time index point
 		t[0] = 1.0;
@@ -614,9 +611,9 @@ void ItompCIOTrajectory::fillInMinJerkCartesianTrajectory(
 		for (int k = 2; k <= 5; k++)
 			t[k] = t[k - 1] * t[1];
 
-		double pos[3];
+        double pos[CARTESIAN_SPACE_DOF];
 
-		for (int j = 0; j < 3; ++j)
+        for (int j = 0; j < CARTESIAN_SPACE_DOF; ++j)
 		{
 			pos[j] = 0;
 			for (int k = 0; k <= 5; k++)
@@ -633,15 +630,16 @@ void ItompCIOTrajectory::fillInMinJerkCartesianTrajectory(
 		vector<double> ik_solution(num_joints_);
 
 		Eigen::Affine3d end_effector_state = Eigen::Affine3d::Identity();
-		Eigen::Quaternion<double> rot(orientation.w, orientation.x,
-                                      orientation.y, orientation.z);
+        Eigen::Quaterniond start_rot(start_orientation.w, start_orientation.x, start_orientation.y, start_orientation.z);
+        Eigen::Quaterniond goal_rot(goal_orientation.w, goal_orientation.x, goal_orientation.y, goal_orientation.z);
+        Eigen::Quaterniond rot = start_rot.slerp(pos[3], goal_rot);
 		Eigen::Vector3d trans(position.x, position.y, position.z);
 		Eigen::Matrix3d mat = rot.toRotationMatrix();
 		end_effector_state.linear() = mat;
 		end_effector_state.translation() = trans;
 
 		kinematics::KinematicsQueryOptions options;
-		options.return_approximate_solution = true;
+        options.return_approximate_solution = false;
 		bool found_ik = false;
 		while (found_ik == false)
 		{
@@ -663,9 +661,14 @@ void ItompCIOTrajectory::fillInMinJerkCartesianTrajectory(
 						++k)
 				{
 					ik_solution[k] = state_pos[k];
-					if (i != start_index)
+                    if (i == end_index)
+                    {
+                        double diff = (*this)(i, k) - state_pos[k];
+                        if (diff * diff > 1e-7)
+                            return false;
+                    }
+                    else if (i != start_index)
 						(*this)(i, k) = state_pos[k];
-					//printf("%f ", state_pos[k]);
 				}
 				//printf("\n");
 				break;
@@ -673,9 +676,12 @@ void ItompCIOTrajectory::fillInMinJerkCartesianTrajectory(
 			else
 			{
 				ROS_INFO("Could not find IK solution for waypoint %d", i);
+                return false;
 			}
 		}
 	}
+
+    return true;
 }
 
 void ItompCIOTrajectory::printTrajectory() const

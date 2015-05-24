@@ -114,7 +114,7 @@ public:
         const ItompCIOTrajectory* getFullTrajectoryConst() const;
         const ItompPlanningGroup* getPlanningGroup() const;
 
-        double getTrajectoryCost(bool verbose = false);
+        double getTrajectoryCost(int trajectory_index, bool verbose = false);
 
         const EvaluationData& getDefaultData() const;
         void setData(EvaluationData* data);
