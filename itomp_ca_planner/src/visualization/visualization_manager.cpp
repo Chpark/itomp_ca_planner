@@ -658,7 +658,9 @@ void VisualizationManager::animateEndeffector(int trajectory_index, int point_st
 {
 	const double scale = 0.005;
     const double scale2 = 0.0025;
-	const int marker_step = 1;
+    const int marker_step = 1;
+
+    visualization_msgs::MarkerArray ma;
 
     visualization_msgs::Marker::_color_type ORANGE;
     ORANGE.a = 1.0;
@@ -688,6 +690,7 @@ void VisualizationManager::animateEndeffector(int trajectory_index, int point_st
     msg2.color = msg.color = COLOR_MAP[trajectory_index];
 
     visualization_msgs::Marker msg_best, msg2_best;
+    visualization_msgs::Marker msg_frame[3], msg_tangent;
     if (best)
     {
         msg_best = msg;
@@ -704,6 +707,25 @@ void VisualizationManager::animateEndeffector(int trajectory_index, int point_st
         msg2_best.scale.z *= 1.2;
 
         msg2_best.color = msg_best.color = COLOR_MAP[YELLOW];
+
+        for (int i = 0; i < 3; ++i)
+        {
+            msg_frame[i] = msg;
+            stringstream ss;
+            ss << "tan" << i;
+            msg_frame[i].ns = ss.str();
+            msg_frame[i].type = visualization_msgs::Marker::LINE_LIST;
+            msg_frame[i].color = COLOR_MAP[(1 << i)];
+        }
+
+        msg_tangent = msg;
+        msg_tangent.ns = "vel";
+        msg_tangent.type = visualization_msgs::Marker::CYLINDER;
+        msg_tangent.color = COLOR_MAP[CYAN];
+        msg_tangent.color.a = 0.5;
+        msg_tangent.scale.x = 0.1;
+        msg_tangent.scale.y = 0.1;
+        msg_tangent.scale.z = 0.001;
     }
 
     for (unsigned int index = 0; index < animate_endeffector_segment_numbers_.size(); ++index)
@@ -727,8 +749,9 @@ void VisualizationManager::animateEndeffector(int trajectory_index, int point_st
 			msg.points.push_back(point);
             msg2.points.push_back(point);
 		}
-		publish(msg);
-        publish(msg2);
+
+        ma.markers.push_back(msg);
+        ma.markers.push_back(msg2);
 
         if (best)
         {
@@ -737,10 +760,96 @@ void VisualizationManager::animateEndeffector(int trajectory_index, int point_st
 
             msg_best.points = msg.points;
             msg2_best.points = msg2.points;
-            publish(msg_best);
-            publish(msg2_best);
+            ma.markers.push_back(msg_best);
+            ma.markers.push_back(msg2_best);
+
+
+            msg_frame[0].id = index;
+            msg_frame[1].id = index;
+            msg_frame[2].id = index;
+            for (int j = point_start; j < point_end; j += marker_step)
+            {
+                geometry_msgs::Point point;
+                geometry_msgs::Point point2;
+                KDL::Vector t;
+
+                point.x = segmentFrames[j][sn].p.x();
+                point.y = segmentFrames[j][sn].p.y();
+                point.z = segmentFrames[j][sn].p.z();
+
+                msg_frame[0].points.push_back(point);
+                msg_frame[1].points.push_back(point);
+                msg_frame[2].points.push_back(point);
+                t = segmentFrames[j][sn].M * KDL::Vector(1.0, 0, 0) * 0.05;
+                point2.x = point.x + t.x();
+                point2.y = point.y + t.y();
+                point2.z = point.z + t.z();
+                msg_frame[0].points.push_back(point2);
+                t = segmentFrames[j][sn].M * KDL::Vector(0, 1.0, 0) * 0.05;
+                point2.x = point.x + t.x();
+                point2.y = point.y + t.y();
+                point2.z = point.z + t.z();
+                msg_frame[1].points.push_back(point2);
+                t = segmentFrames[j][sn].M * KDL::Vector(0, 0, 1.0) * 0.05;
+                point2.x = point.x + t.x();
+                point2.y = point.y + t.y();
+                point2.z = point.z + t.z();
+                msg_frame[2].points.push_back(point2);
+
+                KDL::Vector dir = segmentFrames[j + 1][sn].p - segmentFrames[j - 1][sn].p;
+                if (dir.Norm() > 0.01)
+                {
+                    dir.Normalize();
+                    //msg_tangent.points.push_back(point);
+                    t = 0.1 * dir;
+                    point2.x = point.x + t.x();
+                    point2.y = point.y + t.y();
+                    point2.z = point.z + t.z();
+                    //msg_tangent.points.push_back(point2);
+
+                    msg_tangent.id = j;
+                    msg_tangent.pose.position = point;
+
+                    // rotation from z_axis to vel
+                    Eigen::Vector3d z_axis(0, 0, 1.0);
+                    Eigen::Vector3d vel;
+                    vel.x() = dir.x();
+                    vel.y() = dir.y();
+                    vel.z() = dir.z();
+                    Eigen::Vector3d w = z_axis.cross(vel);
+                    Eigen::Quaterniond q(1.0 + z_axis.dot(vel), w.x(), w.y(), w.z());
+                    q.normalize();
+                    msg_tangent.pose.orientation.x = q.x();
+                    msg_tangent.pose.orientation.y = q.y();
+                    msg_tangent.pose.orientation.z = q.z();
+                    msg_tangent.pose.orientation.w = q.w();
+
+                    msg_tangent.scale.x = 0.1;
+                    msg_tangent.scale.y = 0.1;
+                    msg_tangent.scale.z = 0.001;
+
+                    ma.markers.push_back(msg_tangent);
+                }
+                else
+                {
+                    msg_tangent.id = j;
+                    msg_tangent.pose.position = point;
+
+                    msg_tangent.scale.x = 0.0;
+                    msg_tangent.scale.y = 0.0;
+                    msg_tangent.scale.z = 0.0;
+
+                    ma.markers.push_back(msg_tangent);
+                }
+            }
+
+            ma.markers.push_back(msg_frame[0]);
+            ma.markers.push_back(msg_frame[1]);
+            ma.markers.push_back(msg_frame[2]);
+
         }
 	}
+    publish(ma);
 }
 
 void VisualizationManager::animateRoot(int numFreeVars, int freeVarStartIndex,

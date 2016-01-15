@@ -1004,9 +1004,39 @@ void EvaluationManager::computeFTRs(int begin, int end)
 
 void EvaluationManager::printDebugInfo()
 {
+    return;
+
 	if (PlanningParameters::getInstance()->getCartesianTrajectoryCostWeight()
 			== 0.0)
 		return;
+
+    // TODO : safety constraint
+    {
+        const int END_EFFECTOR_SEGMENT_INDEX = robot_model_->getForwardKinematicsSolver()->segmentNameToIndex("revetting_tcp");
+
+        for (int i = 0; i < num_points_; ++i)
+            data_->stateCartesianTrajectoryCost_[i] = 0;
+
+        int num_vars_free = num_points_ - 10 - 2;
+
+        int point_index = 6;
+        for (int i = point_index; i < point_index + num_vars_free; ++i)
+        {
+            KDL::Frame& frame = data_->segment_frames_[i][END_EFFECTOR_SEGMENT_INDEX];
+            KDL::Frame& frame_prev = data_->segment_frames_[i - 1][END_EFFECTOR_SEGMENT_INDEX];
+            KDL::Frame& frame_next = data_->segment_frames_[i + 1][END_EFFECTOR_SEGMENT_INDEX];
+
+            KDL::Vector tangent = frame_next.p - frame_prev.p;
+            double norm = tangent.Norm();
+            tangent.Normalize();
+            KDL::Vector z_dir = frame.M * KDL::Vector(0, 0, 1.0);
+            double dot = (norm < 0.001) ? 0.0 : KDL::dot(z_dir, tangent);// + 0.1;
+            ROS_INFO("safety [%d] z_dir : %f %f %f tangent : %f %f %f dot : %f", i,
+                     z_dir.x(), z_dir.y(), z_dir.z(),
+                     tangent.x(), tangent.y(), tangent.z(), dot);
+        }
+
+    }
 
 	if (data_->cartesian_waypoints_.size() != 0)
 	{
@@ -1064,6 +1094,39 @@ void EvaluationManager::computeCartesianTrajectoryCosts()
 	if (PlanningParameters::getInstance()->getCartesianTrajectoryCostWeight()
 			== 0.0)
 		return;
+
+    // TODO : safety constraint
+    {
+        const int END_EFFECTOR_SEGMENT_INDEX = robot_model_->getForwardKinematicsSolver()->segmentNameToIndex("revetting_tcp");
+
+        for (int i = 0; i < num_points_; ++i)
+            data_->stateCartesianTrajectoryCost_[i] = 0;
+
+        int num_vars_free = num_points_ - 10 - 2;
+
+        int point_index = 6;
+        for (int i = point_index; i < point_index + num_vars_free; ++i)
+        {
+            KDL::Frame& frame = data_->segment_frames_[i][END_EFFECTOR_SEGMENT_INDEX];
+            KDL::Frame& frame_prev = data_->segment_frames_[i - 1][END_EFFECTOR_SEGMENT_INDEX];
+            KDL::Frame& frame_next = data_->segment_frames_[i + 1][END_EFFECTOR_SEGMENT_INDEX];
+
+            KDL::Vector tangent = frame_next.p - frame_prev.p;
+            double norm = tangent.Norm();
+            tangent.Normalize();
+            if (norm > 0.001)
+            {
+                KDL::Vector z_dir = frame.M * KDL::Vector(0, 0, 1.0);
+                double dot = KDL::dot(z_dir, tangent) + 0.1;
+                if (dot > 0.0)
+                {
+                    data_->stateCartesianTrajectoryCost_[i] = dot * dot;
+                    last_trajectory_collision_free_ = false;
+                }
+            }
+        }
+
+    }
 
 	if (data_->cartesian_waypoints_.size() != 0)
 	{

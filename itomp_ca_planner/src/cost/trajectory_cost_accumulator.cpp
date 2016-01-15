@@ -139,12 +139,12 @@ void TrajectoryCostAccumulator::print(int trajectory_index, int number) const
 	{
 		best_cost_ = cost;
 
-        printf("[%d:%d] Trajectory cost : %f/%f (s=%f, c=%f, gp=%f)\n",
+        printf("[%d:%d] Trajectory cost : %f/%f (s=%f, c=%f, ca=%f)\n",
                trajectory_index,
                number, cost, best_cost_,
                getTrajectoryCost(TrajectoryCost::COST_SMOOTHNESS),
                getTrajectoryCost(TrajectoryCost::COST_COLLISION),
-               getTrajectoryCost(TrajectoryCost::COST_GOAL_POSE));
+               getTrajectoryCost(TrajectoryCost::COST_CARTESIAN_TRAJECTORY));
     }
     else
     {

@@ -134,16 +134,6 @@ bool ItompOptimizer::optimize()
             bool is_best_trajectory = best_cost_manager_->updateBestCost(trajectory_index_, best_group_trajectory_cost_,
                                       is_feasible);
 
-            /*
-			if (is_feasible)
-			{
-				++iteration_after_solution;
-
-                 if (iteration_after_solution > PlanningParameters::getInstance()->getMaxIterationsAfterCollisionFree())
-                    break;
-			}
-            */
-
 			if (!is_updated)
 			{
 				group_trajectory_.getTrajectory() = best_group_trajectory_;

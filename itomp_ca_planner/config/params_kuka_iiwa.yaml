@@ -14,7 +14,7 @@ draw_precomputation: false
 use_precomputation: false
 
 smoothness_cost_weight: 0.00001
-obstacle_cost_weight: 0.0
+obstacle_cost_weight: 1.0
 torque_cost_weight: 0.0
 state_validity_cost_weight: 0.0
 endeffector_velocity_cost_weight: 0.0
@@ -23,7 +23,7 @@ physics_violation_cost_weight: 0.0
 goal_pose_cost_weight: 0.0
 CoM_cost_weight: 0.0
 FTR_cost_weight: 0.0
-cartesian_trajectory_cost_weight: 1.0
+cartesian_trajectory_cost_weight: 0.01
 singularity_cost_weight: 0.0
 smoothness_cost_velocity: 10.0
 smoothness_cost_acceleration: 0.01
@@ -32,12 +32,13 @@ ridge_factor: 0.0
 
 temp: [1000.0, 1000.0, 0.0]
 
-print_planning_info: true
+print_planning_info: false
 
-animate_path: true
+animate_path: false
 animate_endeffector: true
 animate_endeffector_segment:
   lower_body: [revetting_tcp]
+  whole_body: [revetting_tcp]
   lower_body_tcp2: [tcp_2_link]
   lower_body_tcp3: [tcp_3_link]
   torso: torso_x_link
@@ -50,7 +51,7 @@ trajectory_discretization: 0.05
 phase_duration: 0.5
 friction_coefficient: 2.0
 lower_body_root: segment_0
-planning_step_size: 5.0
+planning_step_size: 2.0
 
 collision_links:
   segment_0: true
