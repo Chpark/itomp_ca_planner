@@ -20,6 +20,7 @@
   <depend package="moveit_core"/>
   <depend package="moveit_ros_planning"/>
   <depend package="ecl_geometry"/>
+  <depend package="geometric_shapes"/>
 
   <export>
     <moveit_core plugin="${prefix}/itomp_ca_plugin_description.xml"/>

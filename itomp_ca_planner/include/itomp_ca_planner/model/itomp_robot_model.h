@@ -43,6 +43,7 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <itomp_ca_planner/model/itomp_robot_joint.h>
 #include <itomp_ca_planner/model/treefksolverjointposaxis.hpp>
 #include <itomp_ca_planner/model/treefksolverjointposaxis_partial.hpp>
+#include <itomp_ca_planner/model/robot_collision_model.h>
 #include <kdl/tree.hpp>
 #include <kdl/chain.hpp>
 #include <boost/shared_ptr.hpp>
@@ -119,6 +120,7 @@ public:
 
 private:
 	robot_model::RobotModelPtr robot_model_;
+    RobotCollisionModel collision_model_;
 
 	KDL::Tree kdl_tree_; /**< The KDL tree of the entire robot */
 	int num_kdl_joints_; /**< Total number of joints in the KDL tree */

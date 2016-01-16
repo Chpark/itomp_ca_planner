@@ -219,6 +219,8 @@ bool ItompRobotModel::init(robot_model::RobotModelPtr& robot_model, const std::s
     planning_groups_["whole_body"].contactPoints_.push_back(ContactPoint("right_hand_endeffector_link", this));
   }
 
+  collision_model_.init(robot_model_);
+
   ROS_INFO("Initialized ITOMP robot model in %s reference frame.", reference_frame_.c_str());
 
   return true;
