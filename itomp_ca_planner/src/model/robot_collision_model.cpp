@@ -56,6 +56,127 @@ RobotCollisionModel::~RobotCollisionModel()
 
 }
 
+void RobotCollisionModel::computeCollisionSpheres2(const shapes::Mesh *mesh, std::vector<CollisionSphere>& collision_spheres)
+{
+    Eigen::Vector3d box_size, box_offset;
+    computeMeshBoundingBox(mesh, box_size, box_offset);
+
+    unsigned int axis_length_order[] = {0, 2, 1};
+
+    double radius = 0.5 * box_size[axis_length_order[2]] * 1.0;
+
+    Eigen::Vector3d min_axis, max_axis;
+    min_axis = max_axis = box_offset;
+
+    for (unsigned int i = 0; i < mesh->vertex_count ; ++i)
+    {
+        Eigen::Vector3d vertex_position;
+        for (unsigned int j = 0; j < 3; ++j)
+             vertex_position[j] = mesh->vertices[3 * i + j];
+        vertex_position(axis_length_order[1]) = 0.0;
+
+        if (vertex_position(axis_length_order[0]) > max_axis(axis_length_order[0]))
+        {
+            Eigen::Vector3d diff = vertex_position - max_axis;
+            diff(axis_length_order[1]) = 0.0;
+            double dist = diff.norm();
+            if (dist > radius)
+            {
+                double sq_dist_2d = (vertex_position(axis_length_order[2]) - max_axis(axis_length_order[2])) *
+                                    (vertex_position(axis_length_order[2]) - max_axis(axis_length_order[2]));
+                max_axis(axis_length_order[0]) = vertex_position(axis_length_order[0]) - std::sqrt(std::max(0.0, radius * radius - sq_dist_2d));
+            }
+        }
+        else if (vertex_position(axis_length_order[0]) < min_axis(axis_length_order[0]))
+        {
+            Eigen::Vector3d diff = vertex_position - min_axis;
+            diff(axis_length_order[1]) = 0.0;
+            double dist = diff.norm();
+            if (dist > radius)
+            {
+                double sq_dist_2d = (vertex_position(axis_length_order[2]) - min_axis(axis_length_order[2])) *
+                                    (vertex_position(axis_length_order[2]) - min_axis(axis_length_order[2]));
+                min_axis(axis_length_order[0]) = vertex_position(axis_length_order[0]) + std::sqrt(std::max(0.0, radius * radius - sq_dist_2d));
+            }
+        }
+    }
+
+    Eigen::Vector3d spacing;
+    spacing(0) = spacing(1) = spacing(2) = radius;
+    double distance = max_axis(axis_length_order[0]) - min_axis(axis_length_order[0]);
+    int num_points = std::ceil(distance / radius) + 1;
+    spacing(axis_length_order[0]) = distance / (num_points - 1.0);
+
+    std::vector<std::pair<double, double> > min_max_points(num_points,
+            std::make_pair<double, double>(min_axis(axis_length_order[1]), max_axis(axis_length_order[1])));
+
+    for (unsigned int i = 0; i < mesh->vertex_count ; ++i)
+    {
+        Eigen::Vector3d vertex_position;
+        for (unsigned int j = 0; j < 3; ++j)
+             vertex_position[j] = mesh->vertices[3 * i + j];
+
+        int point_index = (int)std::floor((vertex_position(axis_length_order[0]) - (min_axis(axis_length_order[0]))) / spacing(axis_length_order[0]) + 0.5);
+        if (point_index < 0)
+            point_index = 0;
+        if (point_index >= num_points)
+            point_index = num_points - 1;
+        std::pair<double, double>& point_min_max = min_max_points[point_index];
+
+        if (vertex_position(axis_length_order[1]) > point_min_max.second)
+        {
+            Eigen::Vector3d point_max;
+            point_max(axis_length_order[0]) = min_axis(axis_length_order[0]) + spacing(axis_length_order[0]) * point_index;
+            point_max(axis_length_order[2]) = box_offset(axis_length_order[2]);
+            point_max(axis_length_order[1]) = point_min_max.second;
+            Eigen::Vector3d diff = vertex_position - point_max;
+            double dist = diff.norm();
+            if (dist > radius)
+            {
+                double sq_dist_2d = (vertex_position(axis_length_order[0]) - point_max(axis_length_order[0])) *
+                                    (vertex_position(axis_length_order[0]) - point_max(axis_length_order[0]));
+                point_min_max.second = vertex_position(axis_length_order[1]) - std::sqrt(std::max(0.0, radius * radius - sq_dist_2d));
+            }
+        }
+        else if (vertex_position(axis_length_order[1]) < point_min_max.first)
+        {
+            Eigen::Vector3d point_min;
+            point_min(axis_length_order[0]) = min_axis(axis_length_order[0]) + spacing(axis_length_order[0]) * point_index;
+            point_min(axis_length_order[2]) = box_offset(axis_length_order[2]);
+            point_min(axis_length_order[1]) = point_min_max.first;
+            Eigen::Vector3d diff = vertex_position - point_min;
+            double dist = diff.norm();
+            if (dist > radius)
+            {
+                double sq_dist_2d = (vertex_position(axis_length_order[0]) - point_min(axis_length_order[0])) *
+                                    (vertex_position(axis_length_order[0]) - point_min(axis_length_order[0]));
+                point_min_max.first = vertex_position(axis_length_order[1]) + std::sqrt(std::max(0.0, radius * radius - sq_dist_2d));
+            }
+        }
+    }
+
+    Eigen::Vector3d point_pos;
+    point_pos(axis_length_order[2]) = box_offset(axis_length_order[2]);
+    for (int i = 0; i < num_points; i++)
+    {
+        point_pos(axis_length_order[0]) = min_axis(axis_length_order[0]) + spacing(axis_length_order[0]) * i;
+
+        std::pair<double, double>& point_min_max = min_max_points[i];
+        double distance = point_min_max.second - point_min_max.first;
+        int num_points2 = std::ceil(distance / radius) + 1;
+        spacing(axis_length_order[1]) = distance / (num_points2 - 1.0);
+
+        for (int j = 0; j < num_points2; ++j)
+        {
+            point_pos(axis_length_order[1]) = point_min_max.first + spacing(axis_length_order[1]) * j;
+            //point_pos(axis_length_order[1]) = box_offset(axis_length_order[1]);
+            collision_spheres.push_back(CollisionSphere(point_pos, radius));
+
+            //break;
+        }
+    }
+}
+
 void RobotCollisionModel::computeCollisionSpheres(const shapes::Mesh *mesh, std::vector<CollisionSphere>& collision_spheres)
 {
     Eigen::Vector3d box_size, box_offset;
@@ -148,15 +269,7 @@ void RobotCollisionModel::computeMeshBoundingBox(const shapes::Mesh *mesh, Eigen
 
 bool RobotCollisionModel::init(robot_model::RobotModelPtr& robot_model)
 {
-    ros::NodeHandle node_handle;
-    ros::Publisher vis_marker_array_publisher = node_handle.advertise<visualization_msgs::MarkerArray>("itomp_planner/test", 10);
-    std::string reference_frame = robot_model->getModelFrame();
-
     const std::vector<const robot_model::LinkModel*>& link_models = robot_model->getLinkModelsWithCollisionGeometry();
-
-    visualization_msgs::MarkerArray ma;
-
-    int marker_id = 0;
     for (int i = 0; i < link_models.size(); ++i)
     {
         const robot_model::LinkModel* link_model = link_models[i];
@@ -164,158 +277,20 @@ bool RobotCollisionModel::init(robot_model::RobotModelPtr& robot_model)
         const std::vector<shapes::ShapeConstPtr>& shapes = link_model->getShapes();
         for (int j = 0; j < shapes.size(); ++j)
         {
-            shapes::Shape* shape = shapes[j]->clone();
-            if (shape->type != shapes::MESH)
+            if (shapes[j]->type != shapes::MESH)
                 continue;
 
-            const shapes::Mesh *mesh = static_cast<const shapes::Mesh*>(shape);
-
-            Eigen::Vector3d box_size, box_offset;
-            computeMeshBoundingBox(mesh, box_size, box_offset);
-
-            /*
-            bodies::Body* body = bodies::createBodyFromShape(shape);
-            if (body == NULL)
-                continue;
-
-            body->setPadding(0.0);
-            body->setScale(1.0);
-            bodies::BoundingCylinder cyl;
-            body->computeBoundingCylinder(cyl);
-            */
-
-            visualization_msgs::Marker msg;
-            msg.header.frame_id = reference_frame;
-            msg.header.stamp = ros::Time::now();
-            msg.ns = link_name;
-            msg.type = visualization_msgs::Marker::MESH_RESOURCE;
-            msg.action = visualization_msgs::Marker::ADD;
-            msg.scale.x = 1.0;
-            msg.scale.y = 1.0;
-            msg.scale.z = 1.0;
-            msg.id = marker_id;
-            msg.pose.position.x = 0.0;
-            msg.pose.position.y = 0.0;
-            msg.pose.position.z = 0.0;
-            msg.pose.orientation.x = 0.0;
-            msg.pose.orientation.y = 0.0;
-            msg.pose.orientation.z = 0.0;
-            msg.pose.orientation.w = 1.0;
-            msg.color.a = 1.0;
-            msg.color.r = 0.0;
-            msg.color.g = 1.0;
-            msg.color.b = 0.0;
-            msg.mesh_resource = link_model->getVisualMeshFilename();
-            ma.markers.push_back(msg);
-
-            //visualization_msgs::Marker msg;
-            /*
-            msg.header.frame_id = reference_frame;
-            msg.header.stamp = ros::Time::now();
-            stringstream ss;
-            ss << link_name << "_cylinder";
-            msg.ns = ss.str();
-            msg.type = visualization_msgs::Marker::CYLINDER;
-            msg.action = visualization_msgs::Marker::ADD;
-
-            msg.scale.x = cyl.radius * 2;
-            msg.scale.y = cyl.radius * 2;
-            msg.scale.z = cyl.length;
-            msg.pose.position.x = cyl.pose.translation().x();
-            msg.pose.position.y = cyl.pose.translation().y();
-            msg.pose.position.z = cyl.pose.translation().z();
-            Eigen::Quaterniond quat(cyl.pose.linear());
-            msg.pose.orientation.w = quat.w();
-            msg.pose.orientation.x = quat.x();
-            msg.pose.orientation.y = quat.y();
-            msg.pose.orientation.z = quat.z();
-            msg.color.a = 0.5;
-            msg.color.r = 1.0;
-            msg.color.g = 0.0;
-            msg.color.b = 0.0;
-            msg.id = marker_id;
-            */
-
-            msg.header.frame_id = reference_frame;
-            msg.header.stamp = ros::Time::now();
-            stringstream ss;
-            ss << link_name << "_box";
-            msg.ns = ss.str();
-            msg.type = visualization_msgs::Marker::CUBE;
-            msg.action = visualization_msgs::Marker::ADD;
-
-            msg.scale.x = box_size(0);
-            msg.scale.y = box_size(1);
-            msg.scale.z = box_size(2);
-            msg.pose.position.x = box_offset(0);
-            msg.pose.position.y = box_offset(1);
-            msg.pose.position.z = box_offset(2);
-            msg.pose.orientation.w = 1.0;
-            msg.pose.orientation.x = 0.0;
-            msg.pose.orientation.y = 0.0;
-            msg.pose.orientation.z = 0.0;
-            msg.color.a = 0.5;
-            msg.color.r = 1.0;
-            msg.color.g = 0.0;
-            msg.color.b = 0.0;
-            msg.id = marker_id;
-
-            ma.markers.push_back(msg);
+            const shapes::Mesh *mesh = static_cast<const shapes::Mesh*>(shapes[j].get());
 
             std::vector<CollisionSphere> collision_spheres;
-            computeCollisionSpheres(mesh, collision_spheres);
+            if (link_name != "revetting_tool")
+                computeCollisionSpheres(mesh, collision_spheres);
+            else
+                computeCollisionSpheres2(mesh, collision_spheres);
 
-            if (collision_spheres.size() > 0)
-            {
-                msg.header.frame_id = reference_frame;
-                msg.header.stamp = ros::Time::now();
-                stringstream ss;
-                ss << link_name << "_spheres";
-                msg.ns = ss.str();
-                msg.type = visualization_msgs::Marker::SPHERE_LIST;
-                msg.action = visualization_msgs::Marker::ADD;
-
-                msg.scale.x = collision_spheres[0].radius_ * 2;
-                msg.scale.y = collision_spheres[0].radius_ * 2;
-                msg.scale.z = collision_spheres[0].radius_ * 2;
-                msg.pose.position.x = 0.0;
-                msg.pose.position.y = 0.0;
-                msg.pose.position.z = 0.0;
-                msg.points.clear();
-                for (unsigned int k = 0; k < collision_spheres.size(); ++k)
-                {
-                    geometry_msgs::Point point;
-                    point.x = collision_spheres[k].position_(0);
-                    point.y = collision_spheres[k].position_(1);
-                    point.z = collision_spheres[k].position_(2);
-                    msg.points.push_back(point);
-                }
-                msg.pose.orientation.w = 1.0;
-                msg.pose.orientation.x = 0.0;
-                msg.pose.orientation.y = 0.0;
-                msg.pose.orientation.z = 0.0;
-                msg.color.a = 0.5;
-                msg.color.r = 1.0;
-                msg.color.g = 0.0;
-                msg.color.b = 0.0;
-                msg.id = marker_id;
-
-                ma.markers.push_back(msg);
-            }
-
-            ++marker_id;
-
-            delete shape;
-
-
-
-
-            vis_marker_array_publisher.publish(ma);
+            collision_spheres_[link_name].insert(collision_spheres_[link_name].end(), collision_spheres.begin(), collision_spheres.end());
         }
     }
-
-    vis_marker_array_publisher.publish(ma);
-
     return true;
 }
 

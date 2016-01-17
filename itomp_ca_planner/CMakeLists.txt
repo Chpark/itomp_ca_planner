@@ -36,6 +36,7 @@ src/model/itomp_robot_model.cpp
 src/model/itomp_planning_group.cpp
 src/model/treefksolverjointposaxis.cpp
 src/model/treefksolverjointposaxis_partial.cpp
+src/model/robot_collision_model.cpp
 src/trajectory/itomp_cio_trajectory.cpp
 src/cost/smoothness_cost.cpp
 src/cost/trajectory_cost_accumulator.cpp

@@ -518,6 +518,7 @@ void EvaluationManager::render(int trajectory_index, bool is_best)
 	if (PlanningParameters::getInstance()->getAnimatePath())
 	{
         VisualizationManager::getInstance()->animatePath(trajectory_index, getFullTrajectoryConst(), is_best, planning_group_->name_);
+        VisualizationManager::getInstance()->animateCollisionSpheres(trajectory_index, getFullTrajectoryConst(), is_best, planning_group_->name_);
 	}
 
 	if (PlanningParameters::getInstance()->getAnimateEndeffector())

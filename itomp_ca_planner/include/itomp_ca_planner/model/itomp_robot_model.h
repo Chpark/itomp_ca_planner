@@ -115,8 +115,9 @@ public:
 	robot_model::RobotModelPtr getRobotModel();
 	robot_model::RobotModelConstPtr getRobotModel() const;
 
-	std::string getGroupEndeffectorLinkName(
-			const std::string& group_name) const;
+    std::string getGroupEndeffectorLinkName(const std::string& group_name) const;
+
+    const RobotCollisionModel& getRobotCollisionModel() const;
 
 private:
 	robot_model::RobotModelPtr robot_model_;
@@ -237,6 +238,11 @@ inline robot_model::RobotModelConstPtr ItompRobotModel::getRobotModel() const
 inline robot_model::RobotModelPtr ItompRobotModel::getRobotModel()
 {
 	return robot_model_;
+}
+
+inline const RobotCollisionModel& ItompRobotModel::getRobotCollisionModel() const
+{
+    return collision_model_;
 }
 
 

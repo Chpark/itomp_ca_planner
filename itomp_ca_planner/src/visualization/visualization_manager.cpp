@@ -1020,7 +1020,76 @@ void VisualizationManager::animatePath(int trajectory_index,
 	int marker_size = ma.markers.size();
 
 	vis_marker_array_publisher_.publish(ma);
+}
 
+void VisualizationManager::animateCollisionSpheres(int trajectory_index, const ItompCIOTrajectory* traj, bool is_best, const std::string& group_name)
+{
+    if (!is_best)
+        return;
+
+    std::string reference_frame = robot_model_->getRobotModel()->getModelFrame();
+
+    std_msgs::ColorRGBA RED;
+    RED.a = 0.5;
+    RED.r = 1.0;
+    RED.g = 0.0;
+    RED.b = 0.0;
+    ros::Duration dur(100.0);
+
+    visualization_msgs::MarkerArray ma;
+
+    visualization_msgs::Marker msg;
+    msg.header.frame_id = reference_frame;
+    msg.header.stamp = ros::Time::now();
+    msg.type = visualization_msgs::Marker::SPHERE_LIST;
+    msg.action = visualization_msgs::Marker::ADD;
+    msg.pose.position.x = 0.0;
+    msg.pose.position.y = 0.0;
+    msg.pose.position.z = 0.0;
+    msg.pose.orientation.w = 1.0;
+    msg.pose.orientation.x = 0.0;
+    msg.pose.orientation.y = 0.0;
+    msg.pose.orientation.z = 0.0;
+    msg.color = RED;
+    msg.lifetime = dur;
+
+    for (int point = 0; point < traj->getNumPoints(); point += 10)
+    {
+        const Eigen::MatrixXd& mat = traj->getTrajectoryPoint(point);
+        robot_states_[trajectory_index]->setVariablePositions(mat.data());
+        robot_states_[trajectory_index]->updateLinkTransforms();
+
+        int marker_id = 0;
+
+        const std::map<std::string, std::vector<CollisionSphere> >& collision_spheres = robot_model_->getRobotCollisionModel().getCollisionSpheres();
+        for (std::map<std::string, std::vector<CollisionSphere> >::const_iterator it = collision_spheres.begin(); it != collision_spheres.end() ; ++it)
+        {
+            const Eigen::Affine3d& transform = robot_states_[trajectory_index]->getGlobalLinkTransform(it->first);
+            const std::vector<CollisionSphere>& spheres = it->second;
+            if (spheres.size() == 0)
+                continue;
+
+            msg.ns = "global_spheres_" + boost::lexical_cast<std::string>(point);
+            msg.id = marker_id++;
+            msg.scale.x = spheres[0].radius_ * 2;
+            msg.scale.y = spheres[0].radius_ * 2;
+            msg.scale.z = spheres[0].radius_ * 2;
+            msg.points.clear();
+            for (unsigned int i = 0; i < spheres.size(); ++i)
+            {
+                Eigen::Vector3d global_position = transform * spheres[i].position_;
+                geometry_msgs::Point point;
+                point.x = global_position(0);
+                point.y = global_position(1);
+                point.z = global_position(2);
+                msg.points.push_back(point);
+            }
+
+            ma.markers.push_back(msg);
+        }
+    }
+
+    vis_marker_array_publisher_.publish(ma);
 }
 
 }

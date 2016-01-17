@@ -34,7 +34,7 @@ temp: [1000.0, 1000.0, 0.0]
 
 print_planning_info: false
 
-animate_path: false
+animate_path: true
 animate_endeffector: true
 animate_endeffector_segment:
   lower_body: [revetting_tcp]

@@ -61,10 +61,12 @@ public:
     virtual ~RobotCollisionModel();
 
     bool init(robot_model::RobotModelPtr& robot_model);
+    const std::map<std::string, std::vector<CollisionSphere> >& getCollisionSpheres() const;
 
 protected:
     void computeMeshBoundingBox(const shapes::Mesh *mesh, Eigen::Vector3d& box_size, Eigen::Vector3d& box_offset);
     void computeCollisionSpheres(const shapes::Mesh *mesh, std::vector<CollisionSphere>& collision_spheres);
+    void computeCollisionSpheres2(const shapes::Mesh *mesh, std::vector<CollisionSphere>& collision_spheres);
 
     std::map<std::string, std::vector<CollisionSphere> > collision_spheres_;
 };
@@ -75,6 +77,11 @@ inline CollisionSphere::CollisionSphere(const Eigen::Vector3d& position, double 
     : position_(position), radius_(radius)
 {
 
+}
+
+inline const std::map<std::string, std::vector<CollisionSphere> >& RobotCollisionModel::getCollisionSpheres() const
+{
+    return collision_spheres_;
 }
 
 }
