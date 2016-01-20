@@ -23,8 +23,9 @@ physics_violation_cost_weight: 0.0
 goal_pose_cost_weight: 0.0
 CoM_cost_weight: 0.0
 FTR_cost_weight: 0.0
-cartesian_trajectory_cost_weight: 0.01
+cartesian_trajectory_cost_weight: 0.0
 singularity_cost_weight: 0.0
+point_cloud_cost_weight: 10.0
 smoothness_cost_velocity: 10.0
 smoothness_cost_acceleration: 0.01
 smoothness_cost_jerk: 0.0

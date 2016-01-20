@@ -48,6 +48,7 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <kdl/jntarray.hpp>
 #include <ros/publisher.h>
 #include <moveit/planning_scene/planning_scene.h>
+#include <pcpred/prediction/bvh_predictor.h>
 
 namespace itomp_ca_planner
 {
@@ -134,12 +135,14 @@ private:
         void computeCartesianTrajectoryCosts();
         void handleTrajectoryConstraint();
         void computeSingularityCosts();
+        void computePointCloudCosts();
 
         void updateFullTrajectory(int point_index, int joint_index);
         bool performForwardKinematics(int begin, int end);
         void computeCollisionCosts(int begin, int end);
         void computeFTRs(int begin, int end);
         void computeSingularityCosts(int begin, int end);
+        void computePointCloudCosts(int begin, int end);
 
         void backupAndSetVariables(double new_value, DERIVATIVE_VARIABLE_TYPE variable_type, int free_point_index,
                                                            int joint_index);
@@ -191,6 +194,9 @@ private:
         ros::Publisher vis_marker_pub_;
 
         BackupData backup_data_;
+
+        boost::shared_ptr<pcpred::BvhPredictor> bvh_predictor_;
+        Eigen::Affine3d point_cloud_transform_;
 
         // TODO: refactoring
         int getSegmentIndex(int link, bool isLeft) const;
@@ -286,6 +292,11 @@ inline bool EvaluationManager::performForwardKinematics()
 inline void EvaluationManager::computeSingularityCosts()
 {
         computeSingularityCosts(full_vars_start_ + 1, full_vars_end_ - 1);
+}
+
+inline void EvaluationManager::computePointCloudCosts()
+{
+        computePointCloudCosts(full_vars_start_ + 1, full_vars_end_ - 1);
 }
 
 }

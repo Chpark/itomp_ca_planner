@@ -84,6 +84,7 @@ void PlanningParameters::initFromNodeHandle()
 	node_handle.param("cartesian_trajectory_cost_weight",
                       cartesian_trajectory_cost_weight_, 1.0);
 	node_handle.param("singularity_cost_weight", singularity_cost_weight_, 1.0);
+    node_handle.param("point_cloud_cost_weight", point_cloud_cost_weight_, 1.0);
 
 	node_handle.param("smoothness_cost_velocity", smoothness_cost_velocity_,
                       0.0);

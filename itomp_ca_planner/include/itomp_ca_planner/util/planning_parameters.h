@@ -73,6 +73,7 @@ public:
 	double getFTRCostWeight() const;
 	double getCartesianTrajectoryCostWeight() const;
 	double getSingularityCostWeight() const;
+    double getPointCloudCostWeight() const;
 
 	bool getAnimatePath() const;
 	double getSmoothnessCostVelocity() const;
@@ -159,6 +160,7 @@ private:
 	double ftr_cost_weight_;
 	double cartesian_trajectory_cost_weight_;
 	double singularity_cost_weight_;
+    double point_cloud_cost_weight_;
 	bool animate_path_;
 	double smoothness_cost_velocity_;
 	double smoothness_cost_acceleration_;
@@ -301,6 +303,11 @@ inline double PlanningParameters::getCartesianTrajectoryCostWeight() const
 inline double PlanningParameters::getSingularityCostWeight() const
 {
 	return singularity_cost_weight_;
+}
+
+inline double PlanningParameters::getPointCloudCostWeight() const
+{
+    return point_cloud_cost_weight_;
 }
 
 inline bool PlanningParameters::getAnimatePath() const

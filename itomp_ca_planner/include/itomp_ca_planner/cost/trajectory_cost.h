@@ -61,6 +61,7 @@ public:
     COST_FTR,
     COST_CARTESIAN_TRAJECTORY,
     COST_SINGULARITY,
+    COST_POINT_CLOUD,
     COST_TYPES_NUM,
     COST_TYPE_INVALID = COST_TYPES_NUM,
   };
@@ -280,6 +281,24 @@ public:
 protected:
   virtual void doCompute(const EvaluationData* data, Eigen::VectorXd& costData);
 };
+
+class TrajectoryPointCloudCost: public TrajectoryCost
+{
+public:
+  TrajectoryPointCloudCost() :
+      TrajectoryCost(COST_POINT_CLOUD)
+  {
+  }
+  virtual ~TrajectoryPointCloudCost()
+  {
+  }
+
+  virtual double getWeight() const;
+
+protected:
+  virtual void doCompute(const EvaluationData* data, Eigen::VectorXd& costData);
+};
+
 
 }
 ;

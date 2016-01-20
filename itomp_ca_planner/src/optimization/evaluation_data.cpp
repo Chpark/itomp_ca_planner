@@ -130,6 +130,7 @@ void EvaluationData::initialize(ItompCIOTrajectory *full_trajectory, ItompCIOTra
   stateFTRCost_.resize(num_points);
   stateCartesianTrajectoryCost_.resize(num_points);
   stateSingularityCost_.resize(num_points);
+  statePointCloudCost_.resize(num_points);
 
   linkPositions_.resize(num_mass_segments);
   linkVelocities_.resize(num_mass_segments);
@@ -180,6 +181,7 @@ void EvaluationData::initialize(ItompCIOTrajectory *full_trajectory, ItompCIOTra
   //costAccumulator_.addCost(TrajectoryCost::CreateTrajectoryCost(TrajectoryCost::COST_COM));
   //costAccumulator_.addCost(TrajectoryCost::CreateTrajectoryCost(TrajectoryCost::COST_FTR));
   costAccumulator_.addCost(TrajectoryCost::CreateTrajectoryCost(TrajectoryCost::COST_CARTESIAN_TRAJECTORY));
+  costAccumulator_.addCost(TrajectoryCost::CreateTrajectoryCost(TrajectoryCost::COST_POINT_CLOUD));
   costAccumulator_.init(this);
 
   fk_solver_ = *planning_group->fk_solver_.get();

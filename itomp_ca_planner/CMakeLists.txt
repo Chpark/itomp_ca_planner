@@ -7,8 +7,8 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 #  Release        : w/o debug symbols, w/ optimization
 #  RelWithDebInfo : w/ debug symbols, w/ optimization
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
-set(ROS_BUILD_TYPE Release)
-#set(ROS_BUILD_TYPE RelWithDebInfo)
+#set(ROS_BUILD_TYPE Release)
+set(ROS_BUILD_TYPE RelWithDebInfo)
 #set(ROS_BUILD_TYPE Debug)
 
 rosbuild_init()
@@ -64,3 +64,4 @@ rosbuild_add_library(${LIBRARY_NAME} src/itomp_plugin.cpp src/itomp_planning_int
 rosbuild_link_boost(${LIBRARY_NAME} thread)
 
 target_link_libraries(${LIBRARY_NAME} itomp_ca)
+target_link_libraries(${LIBRARY_NAME} pcpred)

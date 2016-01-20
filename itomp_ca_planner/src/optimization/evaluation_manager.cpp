@@ -48,6 +48,8 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <itomp_ca_planner/util/vector_util.h>
 #include <itomp_ca_planner/util/multivariate_gaussian.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <tf/transform_listener.h>
+#include <tf_conversions/tf_eigen.h>
 #include <iostream>
 
 using namespace std;
@@ -137,6 +139,37 @@ void EvaluationManager::initialize(ItompCIOTrajectory *full_trajectory,
         min_jerk_curve_[i] = 6.0 * t5 - 15.0 * t4 + 10.0 * t3;
     }
 
+    const double timestep = 0.05;               // 0.05 s
+    const double sensor_error = 0.001;          // 1 mm
+    const double collision_probability = 0.95;  // 95%
+    const int acceleration_inference_window_size = 5;
+    const int prediction_frames = 10;
+    ros::Rate rate(1. / timestep);
+    // initialize predictor
+    bvh_predictor_.reset(new pcpred::BvhPredictor("../data/bvh/waving.bvh"));  // load bvh file
+    bvh_predictor_->setTimestep(timestep);
+    bvh_predictor_->setSensorDiagonalCovariance(sensor_error * sensor_error);   // variance is proportional to square of sensing error
+    bvh_predictor_->setCollisionProbability(collision_probability);
+    bvh_predictor_->setAccelerationInferenceWindowSize(acceleration_inference_window_size);
+    bvh_predictor_->setVisualizerTopic("bvh_prediction_test");
+
+    tf::TransformListener tf_listener;
+    tf::StampedTransform tf_transform;
+    while (true)
+    {
+        try
+        {
+            tf_listener.lookupTransform("/world", "/odom_combined", ros::Time(0), tf_transform);
+            tf::transformTFToEigen(tf_transform, point_cloud_transform_);
+            break;
+        }
+        catch (tf::TransformException ex)
+        {
+            ROS_ERROR("%s", ex.what());
+            ros::Duration(0.1).sleep();
+        }
+    }
+
 }
 
 double EvaluationManager::evaluate()
@@ -168,6 +201,10 @@ double EvaluationManager::evaluate()
     ADD_TIMER_POINT
 
 	computeCartesianTrajectoryCosts();
+
+    ADD_TIMER_POINT
+
+    computePointCloudCosts();
 
     ADD_TIMER_POINT
 
@@ -526,6 +563,44 @@ void EvaluationManager::render(int trajectory_index, bool is_best)
         VisualizationManager::getInstance()->animateEndeffector(trajectory_index, full_vars_start_, full_vars_end_,
                 data_->segment_frames_, is_best);
 	}
+
+
+    const int prediction_frames = 10;
+    double current_time = 0.0;
+    for (int i = 0; i < 10; ++i)
+    {
+        bvh_predictor_->moveTo(current_time);
+        bvh_predictor_->predict(prediction_frames);
+        current_time += 0.05;
+    }
+
+    /*
+    const int prediction_frames = 10;
+    bvh_predictor_->moveTo(0.0);
+    for (int i = 0; i < full_vars_start_ + 1; ++i)
+    {
+        bvh_predictor_->predict(prediction_frames);
+        bvh_predictor_->moveToNextFrame();
+    }
+    */
+
+
+    for (int future_frame_index = 0; future_frame_index < prediction_frames; future_frame_index++)
+    {
+        std::vector<Eigen::Vector3d> centers;
+        std::vector<Eigen::Matrix3d> A;
+
+        bvh_predictor_->getPredictedEllipsoids(future_frame_index, centers, A);
+
+        for (int j=0; j<centers.size(); j++)
+        {
+            // an ellipsoid is defined by
+            //   (x - centers[j])^T A[j] (x - centers[j]) = 1
+        }
+    }
+
+    bvh_predictor_->visualizeHuman();
+    bvh_predictor_->visualizePredictionUpto(prediction_frames);
 
 }
 
@@ -1330,6 +1405,101 @@ void EvaluationManager::computeSingularityCosts(int begin, int end)
 	if (print_debug_texts_)
 		printf("Min Singular value : (%d) %f ", min_singular_value_index,
                min_singular_value);
+}
+
+void EvaluationManager::computePointCloudCosts(int begin, int end)
+{
+    if (PlanningParameters::getInstance()->getPointCloudCostWeight() == 0.0)
+        return;
+
+    int num_all_joints = data_->kinematic_state_[0]->getVariableCount();
+
+    int num_threads = getNumParallelThreads();
+
+    std::vector<std::vector<double> > positions(num_threads);
+
+    for (int i = 0; i < num_threads; ++i)
+    {
+        positions[i].resize(num_all_joints);
+    }
+
+    int safe_begin = max(0, begin);
+    int safe_end = min(num_points_, end);
+
+    const int replanning_frames = 3;
+    const int prediction_frames = replanning_frames * 2;
+    bvh_predictor_->moveTo(0.0);
+    int current_point = 0;
+    while (true)
+    {
+        bvh_predictor_->predict(prediction_frames);
+
+        //#pragma omp parallel for
+        for (int i = current_point + replanning_frames; i < current_point + prediction_frames; ++i)
+        {
+            if (i < safe_begin)
+                continue;
+            if (i >= safe_end)
+                continue;
+
+            int future_frame_index = i - current_point;
+
+            std::vector<Eigen::Vector3d> mu;
+            std::vector<Eigen::Matrix3d> sigma;
+            std::vector<double> obstacle_sphere_sizes;
+            bvh_predictor_->getPredictedGaussianDistribution(future_frame_index, mu, sigma, obstacle_sphere_sizes);
+            std::vector<Eigen::Matrix3d> sigma_inverse(sigma.size());
+            std::vector<double> determinant(sigma.size());
+            for (unsigned int i = 0; i < sigma.size(); ++i)
+            {
+                sigma_inverse[i] = sigma[i].inverse();
+                determinant[i] = sigma[i].determinant();
+            }
+
+            int thread_num = omp_get_thread_num();
+            robot_state::RobotStatePtr& robot_state = data_->kinematic_state_[thread_num];
+
+            double max_collision_probability = 0.0;
+
+            int full_traj_index = getGroupTrajectory()->getFullTrajectoryIndex(i);
+            for (std::size_t k = 0; k < num_all_joints; k++)
+            {
+                positions[thread_num][k] = (*getFullTrajectory())(full_traj_index, k);
+            }
+            robot_state->setVariablePositions(&positions[thread_num][0]);
+            robot_state->updateLinkTransforms();
+
+            const std::map<std::string, std::vector<CollisionSphere> >& collision_spheres_map = robot_model_->getRobotCollisionModel().getCollisionSpheres();
+            for (std::map<std::string, std::vector<CollisionSphere> >::const_iterator it = collision_spheres_map.begin(); it != collision_spheres_map.end() ; ++it)
+            {
+                const Eigen::Affine3d& transform = robot_state->getGlobalLinkTransform(it->first);
+                const std::vector<CollisionSphere>& collision_spheres = it->second;
+
+                for (unsigned int i = 0; i < collision_spheres.size(); ++i)
+                {
+                    Eigen::Vector3d global_position = point_cloud_transform_ * transform * collision_spheres[i].position_;
+
+                    for (unsigned int j = 0; j < mu.size(); ++j)
+                    {
+                        double radius = collision_spheres[i].radius_ + obstacle_sphere_sizes[j];
+                        double volume = 4.0 / 3.0 * M_PI * radius * radius * radius;
+                        Eigen::Vector3d diff = global_position - mu[j];
+                        double max_point_probability = 1.0 / std::sqrt(std::pow(2 * M_PI, 3) * determinant[j]) * std::exp(-0.5 * diff.transpose() * sigma_inverse[i] * diff);
+                        max_collision_probability = std::max(max_collision_probability, std::min(1.0, max_point_probability * volume));
+                    }
+                }
+            }
+            // 95%?
+            max_collision_probability = std::max(0.0, max_collision_probability - 0.05);
+            data_->statePointCloudCost_[i] = max_collision_probability * max_collision_probability;
+        }
+
+        for (int i = 0; i < replanning_frames; ++i)
+            bvh_predictor_->moveToNextFrame();
+        current_point += replanning_frames;
+        if (current_point >= safe_end)
+            break;
+    }
 }
 
 }

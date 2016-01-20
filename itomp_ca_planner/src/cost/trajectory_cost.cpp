@@ -91,6 +91,10 @@ TrajectoryCostPtr TrajectoryCost::CreateTrajectoryCost(COST_TYPE type)
         newCost.reset(new TrajectorySingularityCost());
         break;
 
+    case COST_POINT_CLOUD:
+        newCost.reset(new TrajectoryPointCloudCost());
+        break;
+
     case COST_ENDEFFECTOR_VELOCITY:
     case COST_TORQUE:
     case COST_RVO:
@@ -332,6 +336,20 @@ void TrajectorySingularityCost::doCompute(const EvaluationData* data, Eigen::Vec
 double TrajectorySingularityCost::getWeight() const
 {
     return PlanningParameters::getInstance()->getSingularityCostWeight();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+void TrajectoryPointCloudCost::doCompute(const EvaluationData* data, Eigen::VectorXd& costData)
+{
+    for (int i = 0; i < data->getNumPoints(); i++)
+    {
+        costData(i) = data->statePointCloudCost_[i];
+    }
+}
+
+double TrajectoryPointCloudCost::getWeight() const
+{
+    return PlanningParameters::getInstance()->getPointCloudCostWeight();
 }
 
 }
