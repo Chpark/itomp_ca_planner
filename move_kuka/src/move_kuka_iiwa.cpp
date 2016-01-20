@@ -147,9 +147,10 @@ void MoveKukaIIWA::run(const std::string& group_name)
     double last_trajectory_start_time = 0.0;
     double last_trajectory_duration = 0.0;
 
-    while (true)
+    //while (true)
+    moveit_msgs::DisplayTrajectory display_trajectory;
+    for (int i = 0; i < 10; ++i)
     {
-        moveit_msgs::DisplayTrajectory display_trajectory;
 
         std::vector<Eigen::Affine3d> end_effector_poses;
         std::vector<robot_state::RobotState> robot_states;
@@ -165,10 +166,17 @@ void MoveKukaIIWA::run(const std::string& group_name)
             // Set start / goal states
             initStartGoalStates(req, end_effector_poses, robot_states, index);
 
+            double ct_cost_weight = 0.0;
+            node_handle_.getParam("/itomp_planner/cartesian_trajectory_cost_weight", ct_cost_weight);
+            if (index % 2 == 0)
+                node_handle_.setParam("/itomp_planner/cartesian_trajectory_cost_weight", 0);
+
             // trajectory optimization using ITOMP
             bool use_itomp = (planner_plugin_name.find("Itomp") != string::npos);
             plan(req, res, use_itomp);
             res.getMessage(response);
+
+            node_handle_.setParam("/itomp_planner/cartesian_trajectory_cost_weight", ct_cost_weight);
 
             last_goal_state_.reset(new robot_state::RobotState(res.trajectory_->getLastWayPoint()));
 
@@ -176,6 +184,8 @@ void MoveKukaIIWA::run(const std::string& group_name)
             if (index == 0)
                 display_trajectory.trajectory_start = response.trajectory_start;
             display_trajectory.trajectory.push_back(response.trajectory);
+
+            break;
         }
 
         double current_time = ros::Time::now().toSec();
@@ -190,6 +200,8 @@ void MoveKukaIIWA::run(const std::string& group_name)
 
         last_trajectory_start_time = ros::Time::now().toSec();
         last_trajectory_duration = (end_effector_poses.size() - 1) * 2.0;
+
+        break;
     }
 
     // clean up
@@ -232,9 +244,11 @@ bool MoveKukaIIWA::initTask(std::vector<Eigen::Affine3d>& end_effector_poses, st
         magazine_frame.translation() *= 0.001;
         Eigen::Affine3d magazine_frame_waypoint_frame = magazine_frame;
         magazine_frame_waypoint_frame.translation() += magazine_frame_waypoint_frame.linear() * Eigen::Vector3d(0, 0, -waypoint_offset);
+
         end_effector_poses.push_back(magazine_frame_waypoint_frame);
-        end_effector_poses.push_back(magazine_frame);
-        end_effector_poses.push_back(magazine_frame_waypoint_frame);
+        //end_effector_poses.push_back(magazine_frame);
+        //end_effector_poses.push_back(magazine_frame_waypoint_frame);
+
 
         // shelf rivet frames
         const TASK_FRAME_INDEX& frame_index = task_frame_indices[i];
@@ -243,8 +257,8 @@ bool MoveKukaIIWA::initTask(std::vector<Eigen::Affine3d>& end_effector_poses, st
         Eigen::Affine3d goal_final_frame = goal_frame;
         goal_final_frame.translation() += goal_final_frame.linear() * Eigen::Vector3d(0, 0, waypoint_offset);
         end_effector_poses.push_back(goal_frame);
-        end_effector_poses.push_back(goal_final_frame);
-        end_effector_poses.push_back(goal_frame);
+        //end_effector_poses.push_back(goal_final_frame);
+        //end_effector_poses.push_back(goal_frame);
     }
 
     robot_states.resize(end_effector_poses.size(), start_state);
@@ -312,22 +326,6 @@ void MoveKukaIIWA::initStartGoalStates(planning_interface::MotionPlanRequest& re
     std::vector<double> tolerance_angle(3, 0.01);
     moveit_msgs::Constraints pose_goal = kinematic_constraints::constructGoalConstraints(end_effector_name, goal_pose, tolerance_pose, tolerance_angle);
     req.goal_constraints.push_back(pose_goal);
-
-    // set path constraint
-    /*
-    moveit_msgs::PositionConstraint pc;
-    pc.link_name = end_effector_name;
-    pc.header.frame_id = robot_model_->getModelFrame();
-    pc.weight = 1.0;
-    pc.target_point_offset.x = prev_trans(0);
-    pc.target_point_offset.y = prev_trans(1);
-    pc.target_point_offset.z = prev_trans(2);
-    req.path_constraints.position_constraints.push_back(pc);
-    pc.target_point_offset.x = trans(0);
-    pc.target_point_offset.y = trans(1);
-    pc.target_point_offset.z = trans(2);
-    req.path_constraints.position_constraints.push_back(pc);
-    */
 
     std::stringstream ss;
     ss << "Start state : ";
@@ -522,8 +520,8 @@ bool MoveKukaIIWA::isStateCollide(const robot_state::RobotState& state)
 {
 	collision_detection::CollisionRequest collision_request;
 	collision_detection::CollisionResult collision_result;
-	collision_request.verbose = false;
-	collision_request.contacts = false;
+    collision_request.verbose = false;
+    collision_request.contacts = false;
 
     planning_scene_->checkCollisionUnpadded(collision_request, collision_result, state);
 

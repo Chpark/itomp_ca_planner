@@ -8,6 +8,7 @@
   </include>
 
   <node pkg="tf" type="static_transform_publisher" name="virtual_joint_broadcaster_0" args="0 0 0 0 0 0 odom_combined segment_0 100" />
+  <node pkg="tf" type="static_transform_publisher" name="virtual_joint_broadcaster_1" args="0 -0.5 0.5 0 0 0 odom_combined world 100" />
 
   <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
     <param name="/use_gui" value="false"/>
