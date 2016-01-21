@@ -48,7 +48,7 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <kdl/jntarray.hpp>
 #include <ros/publisher.h>
 #include <moveit/planning_scene/planning_scene.h>
-#include <pcpred/prediction/bvh_predictor.h>
+#include <pcpred/prediction/gvv_predictor.h>
 
 namespace itomp_ca_planner
 {
@@ -78,6 +78,14 @@ class EvaluationManager
                 std::vector<double> state_contact_invariant_cost_;
                 std::vector<double> state_physics_violation_cost_;
                 std::vector<double> state_ftr_cost_;
+        };
+
+        class PointCloudData
+        {
+        public:
+           std::vector<Eigen::Vector3d> mu_;
+           std::vector<Eigen::Matrix3d> sigma_inverse_;
+           std::vector<double> determinant_;
         };
 
 public:
@@ -126,6 +134,7 @@ public:
 private:
         double evaluate(DERIVATIVE_VARIABLE_TYPE variable_type, int point_index, int joint_index);
 
+        void preprocessPointCloud();
         bool performForwardKinematics();
         void computeTrajectoryValidity();
         void computeMassAndGravityForce();
@@ -195,8 +204,10 @@ private:
 
         BackupData backup_data_;
 
-        boost::shared_ptr<pcpred::BvhPredictor> bvh_predictor_;
+        boost::shared_ptr<pcpred::GvvPredictor> pc_predictor_;
         Eigen::Affine3d point_cloud_transform_;
+        std::vector<std::vector<PointCloudData> > point_cloud_data_;
+        std::vector<double> point_cloud_sphere_sizes_;
 
         // TODO: refactoring
         int getSegmentIndex(int link, bool isLeft) const;
