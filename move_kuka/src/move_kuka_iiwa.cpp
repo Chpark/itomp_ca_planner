@@ -59,6 +59,7 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <boost/serialization/vector.hpp>
 #include <sched.h>
 #include <limits>
+#include <resource_retriever/retriever.h>
 
 using namespace std;
 
@@ -80,40 +81,40 @@ MoveKukaIIWA::~MoveKukaIIWA()
 
 void MoveKukaIIWA::run(const std::string& group_name)
 {
-	// scene initialization
+    // scene initialization
     robot_model_loader::RobotModelLoader robot_model_loader("robot_description");
-	robot_model_ = robot_model_loader.getModel();
-	planning_scene_.reset(new planning_scene::PlanningScene(robot_model_));
+    robot_model_ = robot_model_loader.getModel();
+    planning_scene_.reset(new planning_scene::PlanningScene(robot_model_));
     planning_scene_diff_publisher_ = node_handle_.advertise<moveit_msgs::PlanningScene>("/planning_scene", 1);
-	while (planning_scene_diff_publisher_.getNumSubscribers() < 1)
-	{
-		ros::WallDuration sleep_t(0.5);
-		sleep_t.sleep();
-		ROS_INFO("Waiting planning_scene subscribers");
-	}
+    while (planning_scene_diff_publisher_.getNumSubscribers() < 1)
+    {
+        ros::WallDuration sleep_t(0.5);
+        sleep_t.sleep();
+        ROS_INFO("Waiting planning_scene subscribers");
+    }
 
     loadFrames();
 
-	loadStaticScene();
+    loadStaticScene();
 
-	// planner initialization
-	group_name_ = group_name;
+    // planner initialization
+    group_name_ = group_name;
 
-	boost::scoped_ptr<pluginlib::ClassLoader<planning_interface::PlannerManager> > planner_plugin_loader;
-	std::string planner_plugin_name;
-	if (!node_handle_.getParam("planning_plugin", planner_plugin_name))
-		ROS_FATAL_STREAM("Could not find planner plugin name");
-	try
-	{
+    boost::scoped_ptr<pluginlib::ClassLoader<planning_interface::PlannerManager> > planner_plugin_loader;
+    std::string planner_plugin_name;
+    if (!node_handle_.getParam("planning_plugin", planner_plugin_name))
+        ROS_FATAL_STREAM("Could not find planner plugin name");
+    try
+    {
         planner_plugin_loader.reset(new pluginlib::ClassLoader<planning_interface::PlannerManager>("moveit_core", "planning_interface::PlannerManager"));
     }
     catch (pluginlib::PluginlibException& ex)
-	{
+    {
         ROS_FATAL_STREAM("Exception while creating planning plugin loader " << ex.what());
-	}
+    }
 
-	try
-	{
+    try
+    {
         cpu_set_t mask;
         if (sched_getaffinity(0, sizeof(cpu_set_t), &mask) != 0)
             ROS_ERROR("sched_getaffinity failed");
@@ -122,17 +123,17 @@ void MoveKukaIIWA::run(const std::string& group_name)
             ROS_ERROR("sched_setaffinity failed");
 
         if (!itomp_planner_instance_->initialize(robot_model_, node_handle_.getNamespace()))
-			ROS_FATAL_STREAM("Could not initialize planner instance");
+            ROS_FATAL_STREAM("Could not initialize planner instance");
         ROS_INFO_STREAM("Using planning interface '" << itomp_planner_instance_->getDescription() << "'");
     }
     catch (pluginlib::PluginlibException& ex)
-	{
+    {
         const std::vector<std::string> &classes = planner_plugin_loader->getDeclaredClasses();
-		std::stringstream ss;
+        std::stringstream ss;
         for (std::size_t i = 0; i < classes.size(); ++i)
-			ss << classes[i] << " ";
+            ss << classes[i] << " ";
         ROS_ERROR_STREAM("Exception while loading planner '" << planner_plugin_name << "': " << ex.what() << std::endl << "Available plugins: " << ss.str());
-	}
+    }
 
     display_publisher_ = node_handle_.advertise<moveit_msgs::DisplayTrajectory>("/move_group/display_planned_path", 1, true);
     vis_marker_array_publisher_ = node_handle_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 100, true);
@@ -142,7 +143,7 @@ void MoveKukaIIWA::run(const std::string& group_name)
     ros::WallDuration sleep_time(0.01);
     sleep_time.sleep();
 
-	///////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////
 
     double last_trajectory_start_time = 0.0;
     double last_trajectory_duration = 0.0;
@@ -388,44 +389,44 @@ void MoveKukaIIWA::plan(planning_interface::MotionPlanRequest& req, planning_int
 
 void MoveKukaIIWA::loadStaticScene()
 {
-	moveit_msgs::PlanningScene planning_scene_msg;
-	std::string environment_file;
-	std::vector<double> environment_position;
+    moveit_msgs::PlanningScene planning_scene_msg;
+    std::string environment_file;
+    std::vector<double> environment_position;
 
     node_handle_.param<std::string>("/itomp_planner/environment_model", environment_file, "");
 
-	if (!environment_file.empty())
-	{
-		double scale;
+    if (!environment_file.empty())
+    {
+        double scale;
         node_handle_.param("/itomp_planner/environment_model_scale", scale, 1.0);
-		environment_position.resize(3, 0);
-		if (node_handle_.hasParam("/itomp_planner/environment_model_position"))
-		{
-			XmlRpc::XmlRpcValue segment;
+        environment_position.resize(3, 0);
+        if (node_handle_.hasParam("/itomp_planner/environment_model_position"))
+        {
+            XmlRpc::XmlRpcValue segment;
             node_handle_.getParam("/itomp_planner/environment_model_position", segment);
-			if (segment.getType() == XmlRpc::XmlRpcValue::TypeArray)
-			{
-				int size = segment.size();
-				for (int i = 0; i < size; ++i)
-				{
-					double value = segment[i];
-					environment_position[i] = value;
-				}
-			}
-		}
+            if (segment.getType() == XmlRpc::XmlRpcValue::TypeArray)
+            {
+                int size = segment.size();
+                for (int i = 0; i < size; ++i)
+                {
+                    double value = segment[i];
+                    environment_position[i] = value;
+                }
+            }
+        }
 
-		// Collision object
-		moveit_msgs::CollisionObject collision_object;
-		collision_object.header.frame_id = robot_model_->getModelFrame();
-		collision_object.id = "environment";
-		geometry_msgs::Pose pose;
-		pose.position.x = environment_position[0];
-		pose.position.y = environment_position[1];
-		pose.position.z = environment_position[2];
-		pose.orientation.x = 0.0;
-		pose.orientation.y = 0.0;
-		pose.orientation.z = 0.0;
-		pose.orientation.w = 1.0;
+        // Collision object
+        moveit_msgs::CollisionObject collision_object;
+        collision_object.header.frame_id = robot_model_->getModelFrame();
+        collision_object.id = "environment";
+        geometry_msgs::Pose pose;
+        pose.position.x = environment_position[0];
+        pose.position.y = environment_position[1];
+        pose.position.z = environment_position[2];
+        pose.orientation.x = 0.0;
+        pose.orientation.y = 0.0;
+        pose.orientation.z = 0.0;
+        pose.orientation.w = 1.0;
 
         Eigen::Affine3d& mat = mat_shelf_frame_;
         Eigen::Quaterniond q(mat.linear());
@@ -438,15 +439,15 @@ void MoveKukaIIWA::loadStaticScene()
         pose.position.z = mat.translation().z() * 0.001;
 
         shapes::Mesh* shape = shapes::createMeshFromResource(environment_file, Eigen::Vector3d(scale, scale, scale));
-		shapes::ShapeMsg mesh_msg;
-		shapes::constructMsgFromShape(shape, mesh_msg);
-		shape_msgs::Mesh mesh = boost::get<shape_msgs::Mesh>(mesh_msg);        
+        shapes::ShapeMsg mesh_msg;
+        shapes::constructMsgFromShape(shape, mesh_msg);
+        shape_msgs::Mesh mesh = boost::get<shape_msgs::Mesh>(mesh_msg);
 
-		collision_object.meshes.push_back(mesh);
-		collision_object.mesh_poses.push_back(pose);
+        collision_object.meshes.push_back(mesh);
+        collision_object.mesh_poses.push_back(pose);
 
         // shelf mesh
-        shape = shapes::createMeshFromResource("package://lbr_iiwa_description/env/SME_Aufnahmetisch_shelf_s.dae", Eigen::Vector3d(scale, scale, scale));
+        shape = shapes::createMeshFromResource("package://move_kuka/env/SME_Aufnahmetisch_shelf_s.dae", Eigen::Vector3d(scale, scale, scale));
         shapes::constructMsgFromShape(shape, mesh_msg);
         mesh = boost::get<shape_msgs::Mesh>(mesh_msg);
         const double distLeft2Middle = 11 * 30; // mm
@@ -455,255 +456,276 @@ void MoveKukaIIWA::loadStaticScene()
         collision_object.meshes.push_back(mesh);
         collision_object.mesh_poses.push_back(pose);
 
-		collision_object.operation = collision_object.ADD;
-		//moveit_msgs::PlanningScene planning_scene_msg;
-		planning_scene_msg.world.collision_objects.push_back(collision_object);
-		planning_scene_msg.is_diff = true;
-		planning_scene_->setPlanningSceneDiffMsg(planning_scene_msg);
-	}
+        collision_object.operation = collision_object.ADD;
+        //moveit_msgs::PlanningScene planning_scene_msg;
+        planning_scene_msg.world.collision_objects.push_back(collision_object);
+        planning_scene_msg.is_diff = true;
+        planning_scene_->setPlanningSceneDiffMsg(planning_scene_msg);
+    }
 
-	planning_scene_diff_publisher_.publish(planning_scene_msg);
+    planning_scene_diff_publisher_.publish(planning_scene_msg);
 }
 
 void MoveKukaIIWA::renderStartGoalStates(robot_state::RobotState& start_state, robot_state::RobotState& goal_state)
 {
-	// display start / goal states
-	int num_variables = start_state.getVariableNames().size();
+    // display start / goal states
+    int num_variables = start_state.getVariableNames().size();
     static ros::Publisher start_state_display_publisher = node_handle_.advertise<moveit_msgs::DisplayRobotState>("/move_itomp/display_start_state", 1, true);
-	moveit_msgs::DisplayRobotState disp_start_state;
+    moveit_msgs::DisplayRobotState disp_start_state;
     disp_start_state.state.joint_state.header.frame_id = robot_model_->getModelFrame();
-	disp_start_state.state.joint_state.name = start_state.getVariableNames();
-	disp_start_state.state.joint_state.position.resize(num_variables);
-	memcpy(&disp_start_state.state.joint_state.position[0],
+    disp_start_state.state.joint_state.name = start_state.getVariableNames();
+    disp_start_state.state.joint_state.position.resize(num_variables);
+    memcpy(&disp_start_state.state.joint_state.position[0],
            start_state.getVariablePositions(), sizeof(double) * num_variables);
-	disp_start_state.highlight_links.clear();
+    disp_start_state.highlight_links.clear();
     const std::vector<std::string>& link_model_names = robot_model_->getLinkModelNames();
-	for (unsigned int i = 0; i < link_model_names.size(); ++i)
-	{
-		std_msgs::ColorRGBA color;
+    for (unsigned int i = 0; i < link_model_names.size(); ++i)
+    {
+        std_msgs::ColorRGBA color;
 
-		color.a = 0.5;
-		color.r = 0.0;
-		color.g = 1.0;
-		color.b = 0.5;
+        color.a = 0.5;
+        color.r = 0.0;
+        color.g = 1.0;
+        color.b = 0.5;
 
-		moveit_msgs::ObjectColor obj_color;
-		obj_color.id = link_model_names[i];
-		obj_color.color = color;
-		disp_start_state.highlight_links.push_back(obj_color);
-	}
-	start_state_display_publisher.publish(disp_start_state);
+        moveit_msgs::ObjectColor obj_color;
+        obj_color.id = link_model_names[i];
+        obj_color.color = color;
+        disp_start_state.highlight_links.push_back(obj_color);
+    }
+    start_state_display_publisher.publish(disp_start_state);
 
     static ros::Publisher goal_state_display_publisher = node_handle_.advertise<moveit_msgs::DisplayRobotState>("/move_itomp/display_goal_state", 1, true);
-	moveit_msgs::DisplayRobotState disp_goal_state;
+    moveit_msgs::DisplayRobotState disp_goal_state;
     disp_goal_state.state.joint_state.header.frame_id = robot_model_->getModelFrame();
-	disp_goal_state.state.joint_state.name = goal_state.getVariableNames();
-	disp_goal_state.state.joint_state.position.resize(num_variables);
+    disp_goal_state.state.joint_state.name = goal_state.getVariableNames();
+    disp_goal_state.state.joint_state.position.resize(num_variables);
     memcpy(&disp_goal_state.state.joint_state.position[0], goal_state.getVariablePositions(), sizeof(double) * num_variables);
-	disp_goal_state.highlight_links.clear();
-	for (int i = 0; i < link_model_names.size(); ++i)
-	{
-		std_msgs::ColorRGBA color;
-		color.a = 0.5;
-		color.r = 0.0;
-		color.g = 0.5;
-		color.b = 1.0;
-		moveit_msgs::ObjectColor obj_color;
-		obj_color.id = link_model_names[i];
-		obj_color.color = color;
-		disp_goal_state.highlight_links.push_back(obj_color);
-	}
-	goal_state_display_publisher.publish(disp_goal_state);
+    disp_goal_state.highlight_links.clear();
+    for (int i = 0; i < link_model_names.size(); ++i)
+    {
+        std_msgs::ColorRGBA color;
+        color.a = 0.5;
+        color.r = 0.0;
+        color.g = 0.5;
+        color.b = 1.0;
+        moveit_msgs::ObjectColor obj_color;
+        obj_color.id = link_model_names[i];
+        obj_color.color = color;
+        disp_goal_state.highlight_links.push_back(obj_color);
+    }
+    goal_state_display_publisher.publish(disp_goal_state);
 }
 
 bool MoveKukaIIWA::isStateCollide(const robot_state::RobotState& state)
 {
-	collision_detection::CollisionRequest collision_request;
-	collision_detection::CollisionResult collision_result;
+    collision_detection::CollisionRequest collision_request;
+    collision_detection::CollisionResult collision_result;
     collision_request.verbose = false;
     collision_request.contacts = false;
 
     planning_scene_->checkCollisionUnpadded(collision_request, collision_result, state);
 
-	return collision_result.collision;
+    return collision_result.collision;
 }
 
 bool MoveKukaIIWA::computeIKState(robot_state::RobotState& ik_state, const Eigen::Affine3d& end_effector_state, bool rand)
 {
-	// compute waypoint ik solutions
+    // compute waypoint ik solutions
 
     const robot_state::JointModelGroup* joint_model_group = ik_state.getJointModelGroup(group_name_);
 
-	kinematics::KinematicsQueryOptions options;
-	options.return_approximate_solution = false;
-	bool found_ik = false;
+    kinematics::KinematicsQueryOptions options;
+    options.return_approximate_solution = false;
+    bool found_ik = false;
 
-	robot_state::RobotState org_start(ik_state);
-	int i = 0;
+    robot_state::RobotState org_start(ik_state);
+    int i = 0;
 
-	if (rand)
+    if (rand)
         ik_state.setToRandomPositionsNearBy(joint_model_group, org_start, log(-3) / log(10));
 
-	while (true)
-	{
+    while (true)
+    {
         found_ik = ik_state.setFromIK(joint_model_group, end_effector_state, 10, 0.1, moveit::core::GroupStateValidityCallbackFn(), options);
-		ik_state.update();
+        ik_state.update();
 
-		found_ik &= !isStateCollide(ik_state);
+        found_ik &= !isStateCollide(ik_state);
 
-		if (found_ik && isStateSingular(ik_state))
-			found_ik = false;
+        if (found_ik && isStateSingular(ik_state))
+            found_ik = false;
 
-		if (found_ik)
-			break;
+        if (found_ik)
+            break;
 
-		++i;
+        ++i;
 
-		double dist = log(-3 + 0.001 * i) / log(10);
+        double dist = log(-3 + 0.001 * i) / log(10);
 
-		ik_state.setToRandomPositionsNearBy(joint_model_group, org_start, dist);
+        ik_state.setToRandomPositionsNearBy(joint_model_group, org_start, dist);
 
         break;
-	}
+    }
 
-	if (found_ik)
-	{
-		//ROS_INFO("IK solution found after %d trials", i + 1);
-	}
-	else
-	{
-		ROS_INFO("Could not find IK solution");
-	}
+    if (found_ik)
+    {
+        //ROS_INFO("IK solution found after %d trials", i + 1);
+    }
+    else
+    {
+        ROS_INFO("Could not find IK solution");
+    }
     return found_ik;
 }
 
 void MoveKukaIIWA::drawEndeffectorPosition(int id, const Eigen::Vector3d& position)
 {
-	const double trajectory_color_diff = 0.33;
-	const double scale = 0.02;
-	const int marker_step = 1;
+    const double trajectory_color_diff = 0.33;
+    const double scale = 0.02;
+    const int marker_step = 1;
 
-	visualization_msgs::Marker::_color_type BLUE, LIGHT_YELLOW;
-	visualization_msgs::Marker::_color_type RED, LIGHT_RED;
-	RED.a = 1.0;
-	RED.r = 1.0;
-	RED.g = 0.0;
-	RED.b = 0.0;
-	BLUE.a = 1.0;
-	BLUE.r = 0.5;
-	BLUE.g = 0.5;
-	BLUE.b = 1.0;
-	LIGHT_RED = RED;
-	LIGHT_RED.g = 0.5;
-	LIGHT_RED.b = 0.5;
-	LIGHT_YELLOW = BLUE;
-	LIGHT_YELLOW.b = 0.5;
+    visualization_msgs::Marker::_color_type BLUE, LIGHT_YELLOW;
+    visualization_msgs::Marker::_color_type RED, LIGHT_RED;
+    RED.a = 1.0;
+    RED.r = 1.0;
+    RED.g = 0.0;
+    RED.b = 0.0;
+    BLUE.a = 1.0;
+    BLUE.r = 0.5;
+    BLUE.g = 0.5;
+    BLUE.b = 1.0;
+    LIGHT_RED = RED;
+    LIGHT_RED.g = 0.5;
+    LIGHT_RED.b = 0.5;
+    LIGHT_YELLOW = BLUE;
+    LIGHT_YELLOW.b = 0.5;
 
-	visualization_msgs::Marker msg;
-	msg.header.frame_id = robot_model_->getModelFrame();
-	msg.header.stamp = ros::Time::now();
-	msg.ns = "cartesian_traj";
-	msg.type = visualization_msgs::Marker::CUBE_LIST;
-	msg.action = visualization_msgs::Marker::ADD;
+    visualization_msgs::Marker msg;
+    msg.header.frame_id = robot_model_->getModelFrame();
+    msg.header.stamp = ros::Time::now();
+    msg.ns = "cartesian_traj";
+    msg.type = visualization_msgs::Marker::CUBE_LIST;
+    msg.action = visualization_msgs::Marker::ADD;
 
-	msg.scale.x = scale;
-	msg.scale.y = scale;
-	msg.scale.z = scale;
+    msg.scale.x = scale;
+    msg.scale.y = scale;
+    msg.scale.z = scale;
 
-	msg.id = id;
-	msg.color = BLUE;
+    msg.id = id;
+    msg.color = BLUE;
 
-	msg.points.resize(0);
-	geometry_msgs::Point point;
-	point.x = position(0);
-	point.y = position(1);
-	point.z = position(2);
-	msg.points.push_back(point);
+    msg.points.resize(0);
+    geometry_msgs::Point point;
+    point.x = position(0);
+    point.y = position(1);
+    point.z = position(2);
+    msg.points.push_back(point);
 
-	visualization_msgs::MarkerArray ma;
-	ma.markers.push_back(msg);
-	vis_marker_array_publisher_.publish(ma);
+    visualization_msgs::MarkerArray ma;
+    ma.markers.push_back(msg);
+    vis_marker_array_publisher_.publish(ma);
 }
 
 void MoveKukaIIWA::drawPath(int id, const Eigen::Vector3d& from, const Eigen::Vector3d& to)
 {
-	const double trajectory_color_diff = 0.33;
-	const double scale = 0.005;
-	const int marker_step = 1;
+    const double trajectory_color_diff = 0.33;
+    const double scale = 0.005;
+    const int marker_step = 1;
 
-	visualization_msgs::Marker::_color_type BLUE, LIGHT_YELLOW;
-	visualization_msgs::Marker::_color_type RED, LIGHT_RED;
-	RED.a = 1.0;
-	RED.r = 1.0;
-	RED.g = 0.0;
-	RED.b = 0.0;
-	BLUE.a = 1.0;
-	BLUE.r = 0.5;
-	BLUE.g = 0.5;
-	BLUE.b = 1.0;
-	LIGHT_RED = RED;
-	LIGHT_RED.g = 0.5;
-	LIGHT_RED.b = 0.5;
-	LIGHT_YELLOW = BLUE;
-	LIGHT_YELLOW.b = 0.5;
+    visualization_msgs::Marker::_color_type BLUE, LIGHT_YELLOW;
+    visualization_msgs::Marker::_color_type RED, LIGHT_RED;
+    RED.a = 1.0;
+    RED.r = 1.0;
+    RED.g = 0.0;
+    RED.b = 0.0;
+    BLUE.a = 1.0;
+    BLUE.r = 0.5;
+    BLUE.g = 0.5;
+    BLUE.b = 1.0;
+    LIGHT_RED = RED;
+    LIGHT_RED.g = 0.5;
+    LIGHT_RED.b = 0.5;
+    LIGHT_YELLOW = BLUE;
+    LIGHT_YELLOW.b = 0.5;
 
-	visualization_msgs::Marker msg;
-	msg.header.frame_id = robot_model_->getModelFrame();
-	msg.header.stamp = ros::Time::now();
-	msg.ns = "cartesian_traj";
-	msg.type = visualization_msgs::Marker::LINE_LIST;
-	msg.action = visualization_msgs::Marker::ADD;
+    visualization_msgs::Marker msg;
+    msg.header.frame_id = robot_model_->getModelFrame();
+    msg.header.stamp = ros::Time::now();
+    msg.ns = "cartesian_traj";
+    msg.type = visualization_msgs::Marker::LINE_LIST;
+    msg.action = visualization_msgs::Marker::ADD;
 
-	msg.scale.x = scale;
-	msg.scale.y = scale;
-	msg.scale.z = scale;
+    msg.scale.x = scale;
+    msg.scale.y = scale;
+    msg.scale.z = scale;
 
-	msg.id = id;
-	msg.color = BLUE;
+    msg.id = id;
+    msg.color = BLUE;
 
-	msg.points.resize(0);
-	geometry_msgs::Point point;
+    msg.points.resize(0);
+    geometry_msgs::Point point;
     point.x = from(0);
-	point.y = from(1);
-	point.z = from(2);
-	msg.points.push_back(point);
+    point.y = from(1);
+    point.z = from(2);
+    msg.points.push_back(point);
     point.x = to(0);
-	point.y = to(1);
-	point.z = to(2);
-	msg.points.push_back(point);
+    point.y = to(1);
+    point.z = to(2);
+    msg.points.push_back(point);
 
-	visualization_msgs::MarkerArray ma;
-	ma.markers.push_back(msg);
-	vis_marker_array_publisher_.publish(ma);
+    visualization_msgs::MarkerArray ma;
+    ma.markers.push_back(msg);
+    vis_marker_array_publisher_.publish(ma);
 }
 
 void MoveKukaIIWA::loadFrames()
 {
-    const std::string shelf_frame_file = "/home/chonhyon/hydro_workspace/pjsdream/lbr_iiwa_description/env/shelf.frame.xml";
-    const std::string task_frame_0_file = "/home/chonhyon/hydro_workspace/pjsdream/lbr_iiwa_description/env/taskFrames_angle_0.0_#rows_10_#cols_65.xml";
-    const std::string task_frame_78_file = "/home/chonhyon/hydro_workspace/pjsdream/lbr_iiwa_description/env/taskFrames_angle_0.7853981633974483_#rows_10_#cols_65.xml";
+    const std::string shelf_frame_file = "package://move_kuka/env/shelf.frame.xml";
+    const std::string task_frame_0_file = "package://move_kuka/env/taskFrames_angle_0.0.xml";
+    const std::string task_frame_78_file = "package://move_kuka/env/taskFrames_angle_0.78.xml";
 
     {
-        std::ifstream ifs(shelf_frame_file.c_str());
-        assert(ifs.good());
-        boost::archive::xml_iarchive ia(ifs);
+        resource_retriever::Retriever r;
+        resource_retriever::MemoryResource resource;
+        try
+        {
+            resource = r.get(shelf_frame_file);
+        }
+        catch (resource_retriever::Exception& e)
+        {
+            ROS_ERROR("Failed to retrieve file: %s", e.what());
+            return;
+        }
+
+        const char* buffer = (const char*)resource.data.get();
+        std::stringstream iss(buffer);
+        boost::archive::xml_iarchive ia(iss);
 
         Eigen::Affine3d m;
         HMatrix hm;
         ia >> BOOST_SERIALIZATION_NVP(hm);
         m = hm.getEigen();
-
         //std::cout << m << std::endl;
-
-        ifs.close();
-
         mat_shelf_frame_ = m;
     }
 
     {
-        std::ifstream ifs(task_frame_0_file.c_str());
-        assert(ifs.good());
-        boost::archive::xml_iarchive ia(ifs);
+        resource_retriever::Retriever r;
+        resource_retriever::MemoryResource resource;
+        try
+        {
+            resource = r.get(task_frame_0_file);
+        }
+        catch (resource_retriever::Exception& e)
+        {
+            ROS_ERROR("Failed to retrieve file: %s", e.what());
+            return;
+        }
+
+        const char* buffer = (const char*)resource.data.get();
+        std::stringstream iss(buffer);
+        boost::archive::xml_iarchive ia(iss);
+
         std::vector<HMatrix> hms;
         ia >> BOOST_SERIALIZATION_NVP(hms);
         for (int r = 0; r < 10; ++r)
@@ -714,13 +736,25 @@ void MoveKukaIIWA::loadFrames()
                 //std::cout << mat_task_frames_0_[r][c] << std::endl;
             }
         }
-        ifs.close();
     }
 
     {
-        std::ifstream ifs(task_frame_78_file.c_str());
-        assert(ifs.good());
-        boost::archive::xml_iarchive ia(ifs);
+        resource_retriever::Retriever r;
+        resource_retriever::MemoryResource resource;
+        try
+        {
+            resource = r.get(task_frame_78_file);
+        }
+        catch (resource_retriever::Exception& e)
+        {
+            ROS_ERROR("Failed to retrieve file: %s", e.what());
+            return;
+        }
+
+        const char* buffer = (const char*)resource.data.get();
+        std::stringstream iss(buffer);
+        boost::archive::xml_iarchive ia(iss);
+
         std::vector<HMatrix> hms;
         ia >> BOOST_SERIALIZATION_NVP(hms);
         for (int r = 0; r < 10; ++r)
@@ -731,7 +765,6 @@ void MoveKukaIIWA::loadFrames()
                 //std::cout << mat_task_frames_78_[r][c] << std::endl;
             }
         }
-        ifs.close();
     }
 
     mat_rivet_magazine_(0, 3) = mat_shelf_frame_(0, 3) + 408.64828;
@@ -822,7 +855,7 @@ void MoveKukaIIWA::drawFrames()
         for (int j = 0; j < mat_task_frames_0_[i].size(); ++j)
         {
             //if (j != 0 && i != 0)
-              //  continue;
+            //  continue;
             const Eigen::Affine3d& mat = mat_task_frames_0_[i][j];
             geometry_msgs::Point point_origin;
             point_origin.x = mat.translation()(0) * 0.001;
@@ -953,10 +986,10 @@ int main(int argc, char **argv)
     // for debug
     setbuf(stdout, NULL);
 
-	ros::init(argc, argv, "move_itomp");
-	ros::AsyncSpinner spinner(1);
-	spinner.start();
-	ros::NodeHandle node_handle("~");
+    ros::init(argc, argv, "move_itomp");
+    ros::AsyncSpinner spinner(1);
+    spinner.start();
+    ros::NodeHandle node_handle("~");
 
     if (argc > 1)
     {
@@ -965,7 +998,7 @@ int main(int argc, char **argv)
 
     move_kuka::MoveKukaIIWA* move_kuka = new move_kuka::MoveKukaIIWA(node_handle);
     move_kuka->run("whole_body");
-	delete move_kuka;
+    delete move_kuka;
 
-	return 0;
+    return 0;
 }
