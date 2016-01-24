@@ -533,20 +533,6 @@ void EvaluationManager::render(int trajectory_index, bool is_best)
         VisualizationManager::getInstance()->animateEndeffector(trajectory_index, full_vars_start_, full_vars_end_,
                 data_->segment_frames_, is_best);
 	}
-
-
-    const int prediction_frames = 10;
-    double current_time = 0.0;
-    for (int i = 0; i < 10; ++i)
-    {
-        pc_predictor_->moveTo(current_time);
-        pc_predictor_->predict(prediction_frames);
-        current_time += 0.05;
-    }
-    pc_predictor_->visualizePointcloud();
-    pc_predictor_->visualizeHuman();
-    pc_predictor_->visualizePredictionUpto(prediction_frames);
-
 }
 
 void EvaluationManager::computeMassAndGravityForce()
@@ -1457,18 +1443,17 @@ void EvaluationManager::preprocessPointCloud()
 
     const int replanning_frames = 3;
     const int prediction_frames = replanning_frames * 2;
-    pc_predictor_->moveTo(0.0);
     point_cloud_data_.clear();
     for (int i = 0; i < full_vars_end_ - 1; ++i)
     {
-        pc_predictor_->predict(prediction_frames);
+        pc_predictor_->moveToNextFrame();
         std::vector<PointCloudData> frame_prediction_data(prediction_frames);
 
         for (int j = 0; j < prediction_frames; ++j)
         {
             PointCloudData& pcd = frame_prediction_data[j];
             std::vector<Eigen::Matrix3d> sigma;
-            pc_predictor_->getPredictedGaussianDistribution(j, pcd.mu_, sigma, point_cloud_sphere_sizes_);
+            pc_predictor_->getPredictedGaussianDistribution(j * timestep, pcd.mu_, sigma, point_cloud_sphere_sizes_);
             pcd.determinant_.resize(sigma.size());
             pcd.sigma_inverse_.resize(sigma.size());
             for (int k = 0; k < sigma.size(); ++k)
@@ -1476,9 +1461,13 @@ void EvaluationManager::preprocessPointCloud()
                 pcd.determinant_[k] = sigma[k].determinant();
                 pcd.sigma_inverse_[k] = sigma[k].inverse();
             }
+            if (i == 0)
+                pc_predictor_->visualizePrediction(j * timestep);
         }
         point_cloud_data_.push_back(frame_prediction_data);
     }
+    pc_predictor_->visualizePointcloud();
+    pc_predictor_->visualizeHuman();
 }
 
 }
