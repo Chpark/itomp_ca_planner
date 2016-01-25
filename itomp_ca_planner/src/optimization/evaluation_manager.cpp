@@ -1412,7 +1412,7 @@ void EvaluationManager::preprocessPointCloud()
     const int acceleration_inference_window_size = 5;
 
     // initialize predictor
-    pc_predictor_.reset(new pcpred::GvvPredictor(1));
+    pc_predictor_.reset(new pcpred::KinectPredictor(3));
     pc_predictor_->setTimestep(timestep);
     pc_predictor_->setSensorDiagonalCovariance(sensor_error * sensor_error);   // variance is proportional to square of sensing error
     pc_predictor_->setCollisionProbability(collision_probability);
@@ -1461,7 +1461,8 @@ void EvaluationManager::preprocessPointCloud()
                 pcd.determinant_[k] = sigma[k].determinant();
                 pcd.sigma_inverse_[k] = sigma[k].inverse();
             }
-            if (i == 0)
+            //if (i == 0)
+            pc_predictor_->visualizeHuman();
                 pc_predictor_->visualizePrediction(j * timestep);
         }
         point_cloud_data_.push_back(frame_prediction_data);

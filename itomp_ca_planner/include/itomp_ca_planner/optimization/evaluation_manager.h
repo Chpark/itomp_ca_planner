@@ -48,7 +48,7 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <kdl/jntarray.hpp>
 #include <ros/publisher.h>
 #include <moveit/planning_scene/planning_scene.h>
-#include <pcpred/prediction/gvv_predictor.h>
+#include <pcpred/prediction/kinect_predictor.h>
 
 namespace itomp_ca_planner
 {
@@ -204,7 +204,7 @@ private:
 
         BackupData backup_data_;
 
-        boost::shared_ptr<pcpred::GvvPredictor> pc_predictor_;
+        boost::shared_ptr<pcpred::KinectPredictor> pc_predictor_;
         Eigen::Affine3d point_cloud_transform_;
         std::vector<std::vector<PointCloudData> > point_cloud_data_;
         std::vector<double> point_cloud_sphere_sizes_;
