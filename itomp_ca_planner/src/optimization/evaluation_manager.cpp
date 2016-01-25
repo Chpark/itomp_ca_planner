@@ -48,9 +48,6 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <itomp_ca_planner/util/vector_util.h>
 #include <itomp_ca_planner/util/multivariate_gaussian.h>
 #include <visualization_msgs/MarkerArray.h>
-#include <tf/transform_broadcaster.h>
-#include <tf/transform_listener.h>
-#include <tf_conversions/tf_eigen.h>
 #include <iostream>
 
 using namespace std;
@@ -1412,8 +1409,16 @@ void EvaluationManager::preprocessPointCloud()
     const double collision_probability = 0.95;  // 95%
     const int acceleration_inference_window_size = 5;
 
+    const int sequence_number = 2;
+    const Eigen::Vector3d pointcloud_translates[] =
+    {
+        Eigen::Vector3d(0.0, 0.0, 0.0),
+        Eigen::Vector3d(0.18, 1, -0.9),
+        Eigen::Vector3d(0, -0.5, -0.9),
+    };
+
     // initialize predictor
-    pc_predictor_.reset(new pcpred::KinectPredictor(3));
+    pc_predictor_.reset(new pcpred::KinectPredictor( sequence_number ));
     pc_predictor_->setTimestep(timestep);
     pc_predictor_->setSensorDiagonalCovariance(sensor_error * sensor_error);   // variance is proportional to square of sensing error
     pc_predictor_->setCollisionProbability(collision_probability);
@@ -1427,33 +1432,7 @@ void EvaluationManager::preprocessPointCloud()
 
     // transform
     point_cloud_transform_ = Eigen::Affine3d::Identity();
-    pc_predictor_->translate(Eigen::Vector3d(0.0, -0.5, -0.9));
-
-    // tf broadcast
-    /*
-    static tf::TransformBroadcaster br;
-    tf::Transform transform;
-    transform.setOrigin( tf::Vector3(0.0, -0.5, -0.9) );
-    transform.setRotation( tf::Quaternion(0, 0, 0, 1) );
-    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "/odom_combined", "/world"));
-
-    tf::TransformListener tf_listener;
-    tf::StampedTransform tf_transform;
-    while(true)
-    {
-        try
-        {
-            tf_listener.lookupTransform("/world", "/odom_combined", ros::Time::now(), tf_transform);
-            tf::transformTFToEigen(tf_transform, point_cloud_transform_);
-            break;
-        }
-        catch (tf::TransformException ex)
-        {
-            ROS_INFO("%s", ex.what());
-            ros::Duration(0.1).sleep();
-        }
-    }
-    */
+    pc_predictor_->translate( pointcloud_translates[sequence_number - 1] );
 
     const int replanning_frames = 3;
     const int prediction_frames = replanning_frames * 2;
@@ -1475,7 +1454,7 @@ void EvaluationManager::preprocessPointCloud()
                 pcd.determinant_[k] = sigma[k].determinant();
                 pcd.sigma_inverse_[k] = sigma[k].inverse();
             }
-            //if (i == 0)
+            if (i == 0)
                 pc_predictor_->visualizePrediction(j * timestep);
         }
         point_cloud_data_.push_back(frame_prediction_data);
