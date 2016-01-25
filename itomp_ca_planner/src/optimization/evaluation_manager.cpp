@@ -48,6 +48,7 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <itomp_ca_planner/util/vector_util.h>
 #include <itomp_ca_planner/util/multivariate_gaussian.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 #include <tf_conversions/tf_eigen.h>
 #include <iostream>
@@ -1424,13 +1425,25 @@ void EvaluationManager::preprocessPointCloud()
     pc_predictor_->setGradientDescentAlpha(0.005);
     pc_predictor_->setHumanShapeLengthConstraintEpsilon(0.01);
 
+    // transform
+    point_cloud_transform_ = Eigen::Affine3d::Identity();
+    pc_predictor_->translate(Eigen::Vector3d(0.0, -0.5, -0.9));
+
+    // tf broadcast
+    /*
+    static tf::TransformBroadcaster br;
+    tf::Transform transform;
+    transform.setOrigin( tf::Vector3(0.0, -0.5, -0.9) );
+    transform.setRotation( tf::Quaternion(0, 0, 0, 1) );
+    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "/odom_combined", "/world"));
+
     tf::TransformListener tf_listener;
     tf::StampedTransform tf_transform;
     while(true)
     {
         try
         {
-            tf_listener.lookupTransform("/world", "/odom_combined", ros::Time(0), tf_transform);
+            tf_listener.lookupTransform("/world", "/odom_combined", ros::Time::now(), tf_transform);
             tf::transformTFToEigen(tf_transform, point_cloud_transform_);
             break;
         }
@@ -1440,6 +1453,7 @@ void EvaluationManager::preprocessPointCloud()
             ros::Duration(0.1).sleep();
         }
     }
+    */
 
     const int replanning_frames = 3;
     const int prediction_frames = replanning_frames * 2;
@@ -1462,7 +1476,6 @@ void EvaluationManager::preprocessPointCloud()
                 pcd.sigma_inverse_[k] = sigma[k].inverse();
             }
             //if (i == 0)
-            pc_predictor_->visualizeHuman();
                 pc_predictor_->visualizePrediction(j * timestep);
         }
         point_cloud_data_.push_back(frame_prediction_data);
