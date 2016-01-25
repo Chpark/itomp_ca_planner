@@ -1409,12 +1409,18 @@ void EvaluationManager::preprocessPointCloud()
     const double collision_probability = 0.95;  // 95%
     const int acceleration_inference_window_size = 5;
 
-    const int sequence_number = 2;
+    /* Sequence 1: left hand, slow
+     * Sequence 2: right hand, slow
+     * Sequence 3: left hand, fast
+     * Sequence 4: right hand, fast
+     */
+    const int sequence_number = 1;
     const Eigen::Vector3d pointcloud_translates[] =
     {
-        Eigen::Vector3d(0.0, 0.0, 0.0),
+        Eigen::Vector3d(0.1, -0.7, -0.9),
         Eigen::Vector3d(0.18, 1, -0.9),
         Eigen::Vector3d(0, -0.5, -0.9),
+        Eigen::Vector3d(-0.2, 0.7, -0.9),
     };
 
     // initialize predictor
