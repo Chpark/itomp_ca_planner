@@ -96,7 +96,7 @@ void EvaluationManager::initialize(ItompCIOTrajectory *full_trajectory,
 
 	num_vars_full_ = num_points_ - 2 * (DIFF_RULE_LENGTH - 2); // 111 - 2(7 - 2) = 101
 	full_vars_start_ = (DIFF_RULE_LENGTH - 2); // 7 - 2 = 5
-	full_vars_end_ = num_points_ - (DIFF_RULE_LENGTH - 2); // 111 - (7 - 2) = 106(next var of the last full traj var)
+    full_vars_end_ = num_points_ - (DIFF_RULE_LENGTH - 2); // 111 - (7 - 2) = 106(next var of the last full traj var)
 
 	// set up joint index:
 	group_joint_to_kdl_joint_index_.resize(num_joints_);
@@ -1409,18 +1409,31 @@ void EvaluationManager::preprocessPointCloud()
     const double collision_probability = 0.95;  // 95%
     const int acceleration_inference_window_size = 5;
 
-    /* Sequence 1: left hand, slow
-     * Sequence 2: right hand, slow
-     * Sequence 3: left hand, fast
-     * Sequence 4: right hand, fast
+    /* Sequence 1: left hand, slow, forth
+     * Sequence 2: right hand, slow, forth
+     * Sequence 3: left hand, fast, forth
+     * Sequence 4: right hand, fast, forth
+     * Sequence 5: left hand, left up
+     * Sequence 6: left hand, left down
      */
-    const int sequence_number = 1;
+    const int sequence_number = 5; //PlanningParameters::getInstance()->getInputSequence();
     const Eigen::Vector3d pointcloud_translates[] =
     {
         Eigen::Vector3d(0.1, -0.7, -0.9),
         Eigen::Vector3d(0.18, 1, -0.9),
         Eigen::Vector3d(0, -0.5, -0.9),
         Eigen::Vector3d(-0.2, 0.7, -0.9),
+        Eigen::Vector3d(0.75, -0.7, -0.9),
+        Eigen::Vector3d(0.7, -0.7, -0.9),
+    };
+    const double z_rotations[] =
+    {
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -30.0 / 180.0 * M_PI,
+        -30.0 / 180.0 * M_PI,
     };
 
     // initialize predictor
@@ -1438,6 +1451,9 @@ void EvaluationManager::preprocessPointCloud()
 
     // transform
     point_cloud_transform_ = Eigen::Affine3d::Identity();
+    pc_predictor_->translate( Eigen::Vector3d(0.4, 0.0, 0.0) );
+    pc_predictor_->rotate( z_rotations[sequence_number - 1], Eigen::Vector3d(0, 0, 1) );
+    pc_predictor_->translate( Eigen::Vector3d(-0.4, 0.0, 0.0) );
     pc_predictor_->translate( pointcloud_translates[sequence_number - 1] );
 
     const int replanning_frames = 3;
