@@ -141,6 +141,8 @@ public:
         double getPrecomputationMaxValidSegmentDist() const;
 	bool getDrawPrecomputation();
 
+    int getInputSequence() const;
+
 private:
 	int updateIndex;
 	double trajectory_duration_;
@@ -209,6 +211,8 @@ private:
 	int precomputation_nn_;
 	double precomputation_max_valid_segment_dist_;
 	bool draw_precomputation_;
+
+    int input_sequence_;
 
 	friend class Singleton<PlanningParameters> ;
 };
@@ -470,6 +474,11 @@ inline double PlanningParameters::getPrecomputationMaxValidSegmentDist() const
 inline bool PlanningParameters::getDrawPrecomputation()
 {
 	return draw_precomputation_;
+}
+
+inline int PlanningParameters::getInputSequence() const
+{
+    return input_sequence_;
 }
 
 }

@@ -261,6 +261,9 @@ void PlanningParameters::initFromNodeHandle()
                       precomputation_max_valid_segment_dist_, 0.3);
 	node_handle.param("draw_precomputation",
                       draw_precomputation_, true);
+
+    node_handle.param("input_sequence",
+                      input_sequence_, 1);
 }
 
 } // namespace

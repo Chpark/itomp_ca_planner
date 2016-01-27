@@ -82,5 +82,5 @@ environment_model_scale: 1.0
 
 has_root_6d: false
 
-
+input_sequence: 5
 

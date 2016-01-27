@@ -1416,7 +1416,7 @@ void EvaluationManager::preprocessPointCloud()
      * Sequence 5: left hand, left up
      * Sequence 6: left hand, left down
      */
-    const int sequence_number = 5; //PlanningParameters::getInstance()->getInputSequence();
+    const int sequence_number = PlanningParameters::getInstance()->getInputSequence();
     const Eigen::Vector3d pointcloud_translates[] =
     {
         Eigen::Vector3d(0.1, -0.7, -0.9),
