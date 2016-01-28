@@ -49,6 +49,7 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <ros/publisher.h>
 #include <moveit/planning_scene/planning_scene.h>
 #include <pcpred/prediction/kinect_predictor.h>
+#include <pcpred/util/singleton.h>
 
 namespace itomp_ca_planner
 {
@@ -204,9 +205,10 @@ private:
 
         BackupData backup_data_;
 
-        boost::shared_ptr<pcpred::KinectPredictor> pc_predictor_;
-        Eigen::Affine3d point_cloud_transform_;
+        pcpred::Singleton<pcpred::KinectPredictor> pc_predictor_;
+        pcpred::Singleton<std::vector<std::vector<PointCloudData> > > singleton_point_cloud_data_;
         std::vector<std::vector<PointCloudData> > point_cloud_data_;
+        pcpred::Singleton<std::vector<double> > singleton_point_cloud_sphere_sizes_;
         std::vector<double> point_cloud_sphere_sizes_;
 
         // TODO: refactoring

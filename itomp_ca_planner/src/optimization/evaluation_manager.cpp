@@ -1444,88 +1444,99 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
 
 void EvaluationManager::preprocessPointCloud()
 {
-    const double timestep = 0.05;               // 0.05 s
-    const double sensor_error = 0.001;          // 1 mm
-    const double collision_probability = 0.95;  // 95%
-    const int acceleration_inference_window_size = 5;
-
-    /* Sequence 1: left hand, slow, forth
-     * Sequence 2: right hand, slow, forth
-     * Sequence 3: left hand, fast, forth
-     * Sequence 4: right hand, fast, forth
-     * Sequence 5: left hand, left up
-     * Sequence 6: left hand, left down
-     */
-    const int sequence_number = PlanningParameters::getInstance()->getInputSequence();
-    const Eigen::Vector3d pointcloud_translates[] =
+    if (!pc_predictor_.isCreated())
     {
-        Eigen::Vector3d(0.1, -0.7, -0.9),
-        Eigen::Vector3d(0.18, 1, -0.9),
-        Eigen::Vector3d(0, -0.5, -0.9),
-        Eigen::Vector3d(-0.2, 0.7, -0.9),
-        Eigen::Vector3d(0.75, -1.7, -0.9),
-        Eigen::Vector3d(0.7, -0.7, -0.9),
-    };
-    const double z_rotations[] =
-    {
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        -30.0 / 180.0 * M_PI,
-        -30.0 / 180.0 * M_PI,
-    };
-
-    // initialize predictor
-    pc_predictor_.reset(new pcpred::KinectPredictor( sequence_number ));
-    pc_predictor_->setTimestep(timestep);
-    pc_predictor_->setSensorDiagonalCovariance(sensor_error * sensor_error);   // variance is proportional to square of sensing error
-    pc_predictor_->setCollisionProbability(collision_probability);
-    pc_predictor_->setAccelerationInferenceWindowSize(acceleration_inference_window_size);
-    pc_predictor_->setVisualizerTopic("bvh_prediction_test");
-
-    pc_predictor_->setMaximumIterations(5);
-    pc_predictor_->setGradientDescentMaximumIterations(5);
-    pc_predictor_->setGradientDescentAlpha(0.005);
-    pc_predictor_->setHumanShapeLengthConstraintEpsilon(0.01);
-
-    // transform
-    point_cloud_transform_ = Eigen::Affine3d::Identity();
-    pc_predictor_->translate( Eigen::Vector3d(0.4, 0.0, 0.0) );
-    pc_predictor_->rotate( z_rotations[sequence_number - 1], Eigen::Vector3d(0, 0, 1) );
-    pc_predictor_->translate( Eigen::Vector3d(-0.4, 0.0, 0.0) );
-    pc_predictor_->translate( pointcloud_translates[sequence_number - 1] );
-
-    const int replanning_frames = 3;
-    const int prediction_frames = replanning_frames * 2;
-    point_cloud_data_.clear();
-    ros::Rate rate(30);
-    for (int i = 0; i < full_vars_end_ - 1; ++i)
-    {
-        //if (i==0)
-            pc_predictor_->moveToNextFrame();
-
-        std::vector<PointCloudData> frame_prediction_data(prediction_frames);
-
-        for (int j = 0; j < prediction_frames; ++j)
+        #pragma omp critical
         {
-            PointCloudData& pcd = frame_prediction_data[j];
-            std::vector<Eigen::Matrix3d> sigma;
-            pc_predictor_->getPredictedGaussianDistribution(j * timestep, pcd.mu_, sigma, point_cloud_sphere_sizes_);
-            pcd.determinant_.resize(sigma.size());
-            pcd.sigma_inverse_.resize(sigma.size());
-            for (int k = 0; k < sigma.size(); ++k)
+            if (!pc_predictor_.isCreated())
             {
-                pcd.determinant_[k] = sigma[k].determinant();
-                pcd.sigma_inverse_[k] = sigma[k].inverse();
+                const double timestep = 0.05;               // 0.05 s
+                const double sensor_error = 0.001;          // 1 mm
+                const double collision_probability = 0.95;  // 95%
+                const int acceleration_inference_window_size = 5;
+
+                /* Sequence 1: left hand, slow, forth
+                 * Sequence 2: right hand, slow, forth
+                 * Sequence 3: left hand, fast, forth
+                 * Sequence 4: right hand, fast, forth
+                 * Sequence 5: left hand, left up
+                 * Sequence 6: left hand, left down
+                 */
+                const int sequence_number = PlanningParameters::getInstance()->getInputSequence();
+                const Eigen::Vector3d pointcloud_translates[] =
+                {
+                    Eigen::Vector3d(0.1, -0.7, -0.9),
+                    Eigen::Vector3d(0.18, 1, -0.9),
+                    Eigen::Vector3d(0, -0.5, -0.9),
+                    Eigen::Vector3d(-0.2, 0.7, -0.9),
+                    Eigen::Vector3d(0.75, -1.7, -0.9),
+                    Eigen::Vector3d(0.7, -0.7, -0.9),
+                };
+                const double z_rotations[] =
+                {
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    -30.0 / 180.0 * M_PI,
+                    -30.0 / 180.0 * M_PI,
+                };
+
+                // initialize predictor
+                pc_predictor_.getInstance()->setSequence( sequence_number );
+                pc_predictor_.getInstance()->setTimestep(timestep);
+                pc_predictor_.getInstance()->setSensorDiagonalCovariance(sensor_error * sensor_error);   // variance is proportional to square of sensing error
+                pc_predictor_.getInstance()->setCollisionProbability(collision_probability);
+                pc_predictor_.getInstance()->setAccelerationInferenceWindowSize(acceleration_inference_window_size);
+                pc_predictor_.getInstance()->setVisualizerTopic("bvh_prediction_test");
+
+                pc_predictor_.getInstance()->setMaximumIterations(5);
+                pc_predictor_.getInstance()->setGradientDescentMaximumIterations(5);
+                pc_predictor_.getInstance()->setGradientDescentAlpha(0.005);
+                pc_predictor_.getInstance()->setHumanShapeLengthConstraintEpsilon(0.01);
+
+                // transform
+                pc_predictor_.getInstance()->translate( Eigen::Vector3d(0.4, 0.0, 0.0) );
+                pc_predictor_.getInstance()->rotate( z_rotations[sequence_number - 1], Eigen::Vector3d(0, 0, 1) );
+                pc_predictor_.getInstance()->translate( Eigen::Vector3d(-0.4, 0.0, 0.0) );
+                pc_predictor_.getInstance()->translate( pointcloud_translates[sequence_number - 1] );
+
+                const int replanning_frames = 3;
+                const int prediction_frames = replanning_frames * 2;
+                singleton_point_cloud_data_.getInstance()->clear();
+                ros::Rate rate(30);
+                for (int i = 0; i < full_vars_end_ - 1; ++i)
+                {
+                    //if (i==0)
+                        pc_predictor_.getInstance()->moveToNextFrame();
+
+                    std::vector<PointCloudData> frame_prediction_data(prediction_frames);
+
+                    for (int j = 0; j < prediction_frames; ++j)
+                    {
+                        PointCloudData& pcd = frame_prediction_data[j];
+                        std::vector<Eigen::Matrix3d> sigma;
+                        pc_predictor_.getInstance()->getPredictedGaussianDistribution(j * timestep, pcd.mu_, sigma, *(singleton_point_cloud_sphere_sizes_.getInstance()));
+                        pcd.determinant_.resize(sigma.size());
+                        pcd.sigma_inverse_.resize(sigma.size());
+                        for (int k = 0; k < sigma.size(); ++k)
+                        {
+                            pcd.determinant_[k] = sigma[k].determinant();
+                            pcd.sigma_inverse_[k] = sigma[k].inverse();
+                        }
+                        //if (i == 0)
+                            pc_predictor_.getInstance()->visualizePrediction(j * timestep);
+                    }
+                    singleton_point_cloud_data_.getInstance()->push_back(frame_prediction_data);
+                }
+                pc_predictor_.getInstance()->visualizePointcloud();
+                pc_predictor_.getInstance()->visualizeHuman();
             }
-            //if (i == 0)
-                pc_predictor_->visualizePrediction(j * timestep);
         }
-        point_cloud_data_.push_back(frame_prediction_data);
     }
-    pc_predictor_->visualizePointcloud();
-    pc_predictor_->visualizeHuman();
+
+    point_cloud_data_ = *(singleton_point_cloud_data_.getInstance());
+    point_cloud_sphere_sizes_ = *(singleton_point_cloud_sphere_sizes_.getInstance());
 }
 
 }
