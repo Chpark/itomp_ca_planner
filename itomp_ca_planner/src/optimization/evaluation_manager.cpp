@@ -56,10 +56,12 @@ using namespace Eigen;
 namespace itomp_ca_planner
 {
 static int LeftLegStart = 0;
-
-
-
 static bool STABILITY_COST_VERBOSE = false;
+
+//const int replanning_frames = 20;
+//const int prediction_frames = replanning_frames * 2;
+const int replanning_frames = 0;
+const int prediction_frames = 20;
 
 EvaluationManager::EvaluationManager(int* iteration) :
     iteration_(iteration), data_(&default_data_), count_(0)
@@ -1352,11 +1354,10 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
     int safe_begin = max(0, begin);
     int safe_end = min(num_points_, end);
 
-    const int replanning_frames = 3;
-    const int prediction_frames = replanning_frames * 2;
-    #pragma omp parallel for
-    for (int current_point = 0; current_point < safe_end; current_point += replanning_frames)
+    //for (int current_point = 0; current_point < safe_end; current_point += replanning_frames)
+    int current_point = 0;
     {
+        #pragma omp parallel for
         for (int i = current_point + replanning_frames; i < current_point + prediction_frames; ++i)
         {
             if (i < safe_begin || i >= safe_end)
@@ -1501,8 +1502,6 @@ void EvaluationManager::preprocessPointCloud()
                 pc_predictor_.getInstance()->translate( Eigen::Vector3d(-0.4, 0.0, 0.0) );
                 pc_predictor_.getInstance()->translate( pointcloud_translates[sequence_number - 1] );
 
-                const int replanning_frames = 3;
-                const int prediction_frames = replanning_frames * 2;
                 singleton_point_cloud_data_.getInstance()->clear();
                 ros::Rate rate(30);
                 for (int i = 0; i < full_vars_end_ - 1; ++i)

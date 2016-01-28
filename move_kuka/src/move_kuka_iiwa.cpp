@@ -189,10 +189,10 @@ void MoveKukaIIWA::run(const std::string& group_name)
             display_publisher_.publish(display_trajectory);
 
             double duration;
-            node_handle_.getParam("/itomp_planner/trajectory_duration", duration);
-            node_handle_.setParam("/itomp_planner/trajectory_duration", duration - 1.0);
+            //node_handle_.getParam("/itomp_planner/trajectory_duration", duration);
+            //node_handle_.setParam("/itomp_planner/trajectory_duration", duration - 1.0);
 
-            //break;
+            break;
         }
 
         double current_time = ros::Time::now().toSec();
@@ -387,6 +387,8 @@ void MoveKukaIIWA::plan(planning_interface::MotionPlanRequest& req, planning_int
 
     if (PLANNER_INDEX != -1)
         req.planner_id = algorithms[PLANNER_INDEX];
+
+    req.planner_id = "ITOMP_replanning";
 
     planning_interface::PlanningContextPtr context =
         itomp_planner_instance_->getPlanningContext(planning_scene_, req, res.error_code_);

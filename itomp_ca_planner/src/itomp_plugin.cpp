@@ -77,6 +77,7 @@ public:
 		algs.push_back("ITOMP");
         algs.push_back("ITOMP_Workspace");
         algs.push_back("ITOMP_3steps");
+        algs.push_back("ITOMP_replanning");
 	}
 
 	virtual void setPlannerConfigurations(const planning_interface::PlannerConfigurationMap &pconfig)

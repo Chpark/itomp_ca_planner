@@ -94,6 +94,10 @@ private:
     bool trajectoryOptimization(const std::string& groupName,
                                 const planning_interface::MotionPlanRequest& req,
                                 const planning_scene::PlanningSceneConstPtr& planning_scene);
+    bool trajectoryOptimization(const std::string& groupName,
+                                const planning_interface::MotionPlanRequest& req,
+                                const planning_scene::PlanningSceneConstPtr& planning_scene,
+                                const Eigen::MatrixXd& previous_trajectory);
     void trajectoryOptimization(const std::string& groupName,
                                 const planning_interface::MotionPlanRequest& req,
                                 const planning_scene::PlanningSceneConstPtr& planning_scene,
@@ -102,7 +106,7 @@ private:
 	void
 	fillInResult(const std::vector<std::string>& planningGroups,
                  planning_interface::MotionPlanResponse &res,
-                 bool append = false);
+                 bool append = false, int length = -1);
 
 	ItompRobotModel robot_model_;
 
@@ -162,6 +166,8 @@ private:
                             const std::string& group_name, const std::string& link_name,
                             const planning_scene::PlanningSceneConstPtr& planning_scene,
                             std::vector<robot_state::RobotState>& ik_solution_states) const;
+
+    bool use_replanning_;
 };
 
 }
