@@ -64,7 +64,7 @@ const int replanning_frames = 0;
 const int prediction_frames = 20;
 
 EvaluationManager::EvaluationManager(int* iteration) :
-    iteration_(iteration), data_(&default_data_), count_(0)
+    iteration_(iteration), data_(&default_data_), count_(0), current_point_(0), first_violation_point_(std::numeric_limits<int>::max())
 {
 	print_debug_texts_ = false;
 }
@@ -147,6 +147,8 @@ double EvaluationManager::evaluate()
     INIT_TIME_MEASUREMENT(10)
 
     ADD_TIMER_POINT
+
+    first_violation_point_ = std::numeric_limits<int>::max();
 
 	// do forward kinematics:
 	last_trajectory_collision_free_ = performForwardKinematics();
@@ -919,6 +921,8 @@ void EvaluationManager::computeCollisionCosts(int begin, int end)
 			depthSum += contact.depth;
 
 			last_trajectory_collision_free_ = false;
+            if (full_traj_index < first_violation_point_)
+                first_violation_point_ = full_traj_index;
 		}
 		collision_result[thread_num].clear();
 		data_->stateCollisionCost_[i] = depthSum;
@@ -1353,12 +1357,12 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
 
     int safe_begin = max(0, begin);
     int safe_end = min(num_points_, end);
+    ROS_INFO("num_points : %d %d", num_points_, end);
 
     //for (int current_point = 0; current_point < safe_end; current_point += replanning_frames)
-    int current_point = 0;
     {
-        #pragma omp parallel for
-        for (int i = current_point + replanning_frames; i < current_point + prediction_frames; ++i)
+        //#pragma omp parallel for
+        for (int i = replanning_frames; i < prediction_frames; ++i)
         {
             if (i < safe_begin || i >= safe_end)
                 continue;
@@ -1366,6 +1370,11 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
             int thread_num = omp_get_thread_num();
             robot_state::RobotStatePtr& robot_state = data_->kinematic_state_[thread_num];
             int full_traj_index = getGroupTrajectory()->getFullTrajectoryIndex(i);
+
+            if (current_point_ >= point_cloud_data_.size() || full_traj_index >= point_cloud_data_[current_point_].size())
+                continue;
+
+            const PointCloudData& pcd = point_cloud_data_[current_point_][full_traj_index];
             for (std::size_t k = 0; k < num_all_joints; k++)
             {
                 positions[thread_num][k] = (*getFullTrajectory())(full_traj_index, k);
@@ -1385,7 +1394,6 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
                 {
                     Eigen::Vector3d global_position = transform * collision_spheres[k].position_;
 
-                    const PointCloudData& pcd = point_cloud_data_[current_point][i - current_point];
                     for (unsigned int j = 0; j < pcd.mu_.size(); ++j)
                     {
                         double radius = collision_spheres[k].radius_ + point_cloud_sphere_sizes_[j];
@@ -1434,17 +1442,27 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
                     }
                 }
             }
-            // 95%?
-            max_collision_probability = std::max(0.0, max_collision_probability - 0.05);
+            double confidence_level = 0.95;
+            max_collision_probability = std::max(0.0, max_collision_probability - (1.0 - confidence_level));
             data_->statePointCloudCost_[i] = max_collision_probability * max_collision_probability;
-            if (max_collision_probability >= 0.05)
+            if (max_collision_probability > 0.0 && full_traj_index <= prediction_frames)
+            {
                 last_trajectory_collision_free_ = false;
+                if (full_traj_index < first_violation_point_)
+                {
+                    first_violation_point_ = full_traj_index;
+                    ROS_INFO("set FVP : %d", full_traj_index);
+                }
+            }
         }
     }
 }
 
 void EvaluationManager::preprocessPointCloud()
 {
+    ros::NodeHandle node_handle("~");
+    node_handle.getParam("/itomp_planner/current_point", current_point_);
+
     if (!pc_predictor_.isCreated())
     {
         #pragma omp critical
@@ -1470,7 +1488,7 @@ void EvaluationManager::preprocessPointCloud()
                     Eigen::Vector3d(0.18, 1, -0.9),
                     Eigen::Vector3d(0, -0.5, -0.9),
                     Eigen::Vector3d(-0.2, 0.7, -0.9),
-                    Eigen::Vector3d(0.75, -1.7, -0.9),
+                    Eigen::Vector3d(1.0, -0.5, 0.1),
                     Eigen::Vector3d(0.7, -0.7, -0.9),
                 };
                 const double z_rotations[] =

@@ -185,4 +185,9 @@ bool ItompOptimizer::updateBestTrajectory(double cost)
 	return false;
 }
 
+int ItompOptimizer::getFirstViolationPoint() const
+{
+    return evaluation_manager_.getFirstViolationPoint();
+}
+
 }

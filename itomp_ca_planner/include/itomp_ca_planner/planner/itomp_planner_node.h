@@ -97,7 +97,8 @@ private:
     bool trajectoryOptimization(const std::string& groupName,
                                 const planning_interface::MotionPlanRequest& req,
                                 const planning_scene::PlanningSceneConstPtr& planning_scene,
-                                const Eigen::MatrixXd& previous_trajectory);
+                                const Eigen::MatrixXd& previous_trajectory,
+                                const Eigen::MatrixXd& start_extra_trajectory);
     void trajectoryOptimization(const std::string& groupName,
                                 const planning_interface::MotionPlanRequest& req,
                                 const planning_scene::PlanningSceneConstPtr& planning_scene,
@@ -106,7 +107,7 @@ private:
 	void
 	fillInResult(const std::vector<std::string>& planningGroups,
                  planning_interface::MotionPlanResponse &res,
-                 bool append = false, int length = -1);
+                 bool append = false, int length = -1, int duplicate = 0);
 
 	ItompRobotModel robot_model_;
 

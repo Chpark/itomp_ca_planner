@@ -183,32 +183,99 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
     {
         double total_duration = PlanningParameters::getInstance()->getTrajectoryDuration();
         double duration = total_duration;
-        double planning_step = 1.0;
+        double planning_step = 0.5;
+        int num_planning_step_points = (int)(planning_step / 0.05 + 1e-7);
         Eigen::MatrixXd previous_trajectory;
-        for (int i = 0; i < 10; ++i)
+        Eigen::MatrixXd start_extra_trajectory;
+        sensor_msgs::JointState start_joint_state = req.start_state.joint_state;
+        int current_point = 0;
+        for (int i = 0; i < 100; ++i)
         {
             PlanningParameters::getInstance()->setTrajectoryDuration(duration);
-            initTrajectory(req.start_state.joint_state, planning_scene);
+            initTrajectory(start_joint_state, planning_scene);
+
+            //trajectory_->printTrajectory();
+
+            ros::NodeHandle node_handle("~");
+            node_handle.setParam("/itomp_planner/current_point", current_point);
 
             const string& groupName = planningGroups[0];
+            VisualizationManager::getInstance()->setPlanningGroup(robot_model_, groupName);
             if (i == 0)
                 trajectoryOptimization(groupName, req, planning_scene);
             else
-                trajectoryOptimization(groupName, req, planning_scene, previous_trajectory);
+                trajectoryOptimization(groupName, req, planning_scene, previous_trajectory, start_extra_trajectory);
 
-            int num_points = (int)(planning_step / 0.05 + 1e-7);
-            int start_point = num_points;
+            //trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->printTrajectory();
 
-            previous_trajectory = trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->getTrajectory().block(start_point, 0,
-                    trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->getTrajectory().rows()-start_point,
-                    trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->getTrajectory().cols());
+            int first_violation_point = optimizers_[best_cost_manager_.getBestCostTrajectoryIndex()]->getFirstViolationPoint();
+            ROS_INFO("current time %f duration : %f FVP : %d", current_point * 0.05, duration, first_violation_point);
+
+            int num_joints = trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->getTrajectory().cols();
+
+            int processed_points = num_planning_step_points;
+            if (first_violation_point < num_planning_step_points)
+            {
+                processed_points = first_violation_point;
+            }
+            if (first_violation_point == num_planning_step_points && duration == 0.5 * num_planning_step_points)
+            {
+                processed_points = num_planning_step_points - 1;
+            }
+
+            previous_trajectory = trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->getTrajectory().block(processed_points, 0,
+                    trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->getTrajectory().rows() - processed_points,
+                    num_joints);
             ROS_INFO("rows,cols : %d %d", previous_trajectory.rows(), previous_trajectory.cols());
+            start_extra_trajectory = trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->getTrajectory().block(
+                        std::max(0, processed_points - 5), 0,
+                        std::min(5, (int)(trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->getTrajectory().rows() - processed_points)), num_joints);
+            if (start_extra_trajectory.rows() < 5)
+            {
+                Eigen::MatrixXd temp(5, num_joints);
+                int src = start_extra_trajectory.rows() - 1;
+                for(int dest = 4; dest >= 0; --dest)
+                {
+                       temp.block(dest, 0, 1, num_joints) = start_extra_trajectory.block(src, 0, 1, num_joints);
+                       src = std::max(0, src - 1);
+                }
+                start_extra_trajectory = temp;
+            }
+            if (previous_trajectory.rows() < 11)
+            {
+                Eigen::MatrixXd temp(11, num_joints);
+                int src = 0;
+                for(int dest = 0; dest < 11; ++dest)
+                {
+                       temp.block(dest, 0, 1, num_joints) = previous_trajectory.block(src, 0, 1, num_joints);
+                       src = std::min((int)(previous_trajectory.rows() - 1), src + 1);
+                }
+                previous_trajectory = temp;
+            }
 
-            fillInResult(planningGroups, res, i > 0, num_points);
+            duration -= 0.05 * processed_points;
 
-            duration -= planning_step;
+            if (duration <= 0.0)
+            {
+                ++processed_points;
+            }
+
+            for (int i = 0; i < num_joints; ++i)
+            {
+                start_joint_state.position[i] = previous_trajectory(0, i);
+                start_joint_state.velocity[i] = 0.0;
+                start_joint_state.effort[i] = 0.0;
+            }
+
+            fillInResult(planningGroups, res, i > 0, processed_points, std::max(0, num_planning_step_points - processed_points));
+
+
+
             if (duration <= 0.0)
                 break;
+            duration = std::max(duration, 0.05 * num_planning_step_points);
+
+            current_point += processed_points;
         }
         PlanningParameters::getInstance()->setTrajectoryDuration(total_duration);
     }
@@ -519,7 +586,8 @@ bool ItompPlannerNode::trajectoryOptimization(const string& groupName,
 bool ItompPlannerNode::trajectoryOptimization(const std::string& groupName,
                             const planning_interface::MotionPlanRequest& req,
                             const planning_scene::PlanningSceneConstPtr& planning_scene,
-                            const Eigen::MatrixXd& previous_trajectory)
+                            const Eigen::MatrixXd& previous_trajectory,
+                            const Eigen::MatrixXd& start_extra_trajectory)
 {
     if (fillGroupJointTrajectory(groupName, req, planning_scene) == false)
         return false;
@@ -539,9 +607,13 @@ bool ItompPlannerNode::trajectoryOptimization(const std::string& groupName,
 
     optimizers_.resize(num_trajectories);
     for (int i = 0; i < num_trajectories; ++i)
+    {
         optimizers_[i].reset(new ItompOptimizer(i, trajectories_[i].get(), &robot_model_,
                                                 group, planning_start_time_, trajectory_start_time_,
                                                 req.path_constraints, &best_cost_manager_, planning_scene));
+        optimizers_[i]->getGroupTrajectory().getTrajectory().block(0, 0, 5, optimizers_[i]->getGroupTrajectory().getNumJoints()) = start_extra_trajectory;
+        //optimizers_[i]->getGroupTrajectory().printTrajectory();
+    }
 
     std::vector<boost::shared_ptr<boost::thread> > optimization_threads(num_trajectories);
     for (int i = 0; i < num_trajectories; ++i)
@@ -589,7 +661,7 @@ void ItompPlannerNode::trajectoryOptimization(const std::string& groupName,
 
 void ItompPlannerNode::fillInResult(const std::vector<std::string>& planningGroups,
                                     planning_interface::MotionPlanResponse &res,
-                                    bool append, int length)
+                                    bool append, int length, int duplicate)
 {
 	int best_trajectory_index = best_cost_manager_.getBestCostTrajectoryIndex();
     ROS_INFO("Best Trajectory index : %d", best_trajectory_index);
@@ -607,21 +679,26 @@ void ItompPlannerNode::fillInResult(const std::vector<std::string>& planningGrou
     if (length == -1)
         length = trajectories_[best_trajectory_index]->getNumPoints();
 
+    trajectories_[best_trajectory_index]->printTrajectory();
+
     std::vector<double> velocity_limits(num_all_joints, std::numeric_limits<double>::max());
 
 	robot_state::RobotState ks = *complete_initial_robot_state_;
 	std::vector<double> positions(num_all_joints);
 	double duration = trajectories_[best_trajectory_index]->getDiscretization();
-    for (std::size_t i = 0; i < length; ++i)
+    for (std::size_t i = 0; i < length + duplicate; ++i)
 	{
-		for (std::size_t j = 0; j < num_all_joints; j++)
-		{
-			positions[j] = (*trajectories_[best_trajectory_index])(i, j);
-		}
+        if (i < length)
+        {
+            for (std::size_t j = 0; j < num_all_joints; j++)
+            {
+                positions[j] = (*trajectories_[best_trajectory_index])(i, j);
+            }
 
-		ks.setVariablePositions(&positions[0]);
-		// TODO: copy vel/acc
-		ks.update();
+            ks.setVariablePositions(&positions[0]);
+            // TODO: copy vel/acc
+            ks.update();
+        }
 
 		res.trajectory_->addSuffixWayPoint(ks, duration);
 	}
@@ -634,7 +711,7 @@ void ItompPlannerNode::fillInResult(const std::vector<std::string>& planningGrou
         for (int j = 0; j < num_all_joints; j++)
             printf("%s ", joint_names[j].c_str());
         printf("\n");
-        for (int i = 0; i < trajectories_[best_trajectory_index]->getNumPoints(); ++i)
+        for (int i = 0; i < res.trajectory_->getWayPointCount(); ++i)
         {
             for (int j = 0; j < num_all_joints; j++)
             {

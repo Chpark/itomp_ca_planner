@@ -115,6 +115,7 @@ public:
                                                            int joint_index);
 
         bool isLastTrajectoryFeasible() const;
+        int getFirstViolationPoint() const;
 
         void handleJointLimits();
         void updateFullTrajectory();
@@ -217,6 +218,8 @@ private:
         KDL::JntArray phaseJointArray_[3];
 
         std::vector<double> min_jerk_curve_;
+        int current_point_;
+        int first_violation_point_;
 
         // for debug
         std::vector<double> timings_;
@@ -289,7 +292,7 @@ inline void EvaluationManager::setDataToDefault()
 
 inline void EvaluationManager::computeCollisionCosts()
 {
-        computeCollisionCosts(full_vars_start_ + 1, full_vars_end_ - 1);
+        computeCollisionCosts(full_vars_start_ + 1, full_vars_end_);
 }
 
 inline void EvaluationManager::computeFTRs()
@@ -304,12 +307,17 @@ inline bool EvaluationManager::performForwardKinematics()
 
 inline void EvaluationManager::computeSingularityCosts()
 {
-        computeSingularityCosts(full_vars_start_ + 1, full_vars_end_ - 1);
+        computeSingularityCosts(full_vars_start_ + 1, full_vars_end_);
 }
 
 inline void EvaluationManager::computePointCloudCosts()
 {
-        computePointCloudCosts(full_vars_start_ + 1, full_vars_end_ - 1);
+        computePointCloudCosts(full_vars_start_ + 1, full_vars_end_);
+}
+
+inline int EvaluationManager::getFirstViolationPoint() const
+{
+        return first_violation_point_;
 }
 
 }

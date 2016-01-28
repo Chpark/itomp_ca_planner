@@ -62,6 +62,9 @@ public:
 	double getBestCost() const;
 	bool isSucceed() const;
 	int getLastIteration() const;
+    int getFirstViolationPoint() const;
+
+    ItompCIOTrajectory& getGroupTrajectory();
 
 private:
 	void initialize(ItompRobotModel *robot_model, const ItompPlanningGroup *planning_group,
@@ -108,6 +111,11 @@ inline bool ItompOptimizer::isSucceed() const
 inline int ItompOptimizer::getLastIteration() const
 {
 	return iteration_;
+}
+
+inline ItompCIOTrajectory& ItompOptimizer::getGroupTrajectory()
+{
+    return group_trajectory_;
 }
 
 }
