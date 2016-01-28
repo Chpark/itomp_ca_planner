@@ -1397,6 +1397,8 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
                             xmax = pcd.mu_[j];
                         else
                         {
+                            /*
+                            // find xmax using binary search
                             double l=0, h=100000000;
                             xmax = global_position;
                             int it = 0;
@@ -1418,6 +1420,10 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
                             }
                             //printf("xmaxdiff %lf radius %lf iteration %d\n", (xmax - global_position).norm(), radius, it);
                             //fflush(stdout);
+                            */
+
+                            // find xmax to the direction of mu
+                            xmax = global_position + (pcd.mu_[j] - global_position).normalized() * radius;
                         }
                         diff = xmax - pcd.mu_[j];
 
