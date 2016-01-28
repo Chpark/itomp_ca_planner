@@ -1382,7 +1382,7 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
 
                 for (unsigned int k = 0; k < collision_spheres.size(); ++k)
                 {
-                    Eigen::Vector3d global_position = point_cloud_transform_ * transform * collision_spheres[k].position_;
+                    Eigen::Vector3d global_position = transform * collision_spheres[k].position_;
 
                     const PointCloudData& pcd = point_cloud_data_[current_point][i - current_point];
                     for (unsigned int j = 0; j < pcd.mu_.size(); ++j)
@@ -1390,7 +1390,39 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
                         double radius = collision_spheres[k].radius_ + point_cloud_sphere_sizes_[j];
                         double volume = 4.0 / 3.0 * M_PI * radius * radius * radius;
                         Eigen::Vector3d diff = global_position - pcd.mu_[j];
+
+                        Eigen::Vector3d xmax;
+
+                        if(diff.norm() <= radius)
+                            xmax = pcd.mu_[j];
+                        else
+                        {
+                            double l=0, h=100000000;
+                            xmax = global_position;
+                            int it = 0;
+                            while (h-l > 1e-5)
+                            {
+                                double lambda = (l+h)/2;
+                                Eigen::Vector3d xc = (pcd.sigma_inverse_[j] + lambda * Eigen::Matrix3d::Identity()).inverse() * (pcd.sigma_inverse_[j] * pcd.mu_[j] + lambda * global_position);
+                                //printf("lambda %lf norm %lf\n", lambda, (xc - global_position).norm());
+                                double diff = (xc - global_position).squaredNorm() - radius * radius;
+                                if (std::abs(diff) <= 1e-5)
+                                {
+                                    xmax = xc;
+                                    break;
+                                }
+                                if (diff < 0) h = lambda;
+                                else l = lambda;
+
+                                it++;
+                            }
+                            //printf("xmaxdiff %lf radius %lf iteration %d\n", (xmax - global_position).norm(), radius, it);
+                            //fflush(stdout);
+                        }
+                        diff = xmax - pcd.mu_[j];
+
                         double max_point_probability = 1.0 / std::sqrt(std::pow(2 * M_PI, 3) * pcd.determinant_[j]) * std::exp(-0.5 * diff.transpose() * pcd.sigma_inverse_[j] * diff);
+
                         max_collision_probability = std::max(max_collision_probability, std::min(1.0, max_point_probability * volume));
                     }
                 }
@@ -1398,6 +1430,8 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
             // 95%?
             max_collision_probability = std::max(0.0, max_collision_probability - 0.05);
             data_->statePointCloudCost_[i] = max_collision_probability * max_collision_probability;
+            if (max_collision_probability >= 0.05)
+                last_trajectory_collision_free_ = false;
         }
     }
 }
@@ -1423,7 +1457,7 @@ void EvaluationManager::preprocessPointCloud()
         Eigen::Vector3d(0.18, 1, -0.9),
         Eigen::Vector3d(0, -0.5, -0.9),
         Eigen::Vector3d(-0.2, 0.7, -0.9),
-        Eigen::Vector3d(0.75, -0.7, -0.9),
+        Eigen::Vector3d(0.75, -1.7, -0.9),
         Eigen::Vector3d(0.7, -0.7, -0.9),
     };
     const double z_rotations[] =
@@ -1459,9 +1493,12 @@ void EvaluationManager::preprocessPointCloud()
     const int replanning_frames = 3;
     const int prediction_frames = replanning_frames * 2;
     point_cloud_data_.clear();
+    ros::Rate rate(30);
     for (int i = 0; i < full_vars_end_ - 1; ++i)
     {
-        pc_predictor_->moveToNextFrame();
+        //if (i==0)
+            pc_predictor_->moveToNextFrame();
+
         std::vector<PointCloudData> frame_prediction_data(prediction_frames);
 
         for (int j = 0; j < prediction_frames; ++j)
@@ -1476,7 +1513,7 @@ void EvaluationManager::preprocessPointCloud()
                 pcd.determinant_[k] = sigma[k].determinant();
                 pcd.sigma_inverse_[k] = sigma[k].inverse();
             }
-            if (i == 0)
+            //if (i == 0)
                 pc_predictor_->visualizePrediction(j * timestep);
         }
         point_cloud_data_.push_back(frame_prediction_data);

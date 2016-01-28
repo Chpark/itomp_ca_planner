@@ -186,7 +186,13 @@ void MoveKukaIIWA::run(const std::string& group_name)
                 display_trajectory.trajectory_start = response.trajectory_start;
             display_trajectory.trajectory.push_back(response.trajectory);
 
-            break;
+            display_publisher_.publish(display_trajectory);
+
+            double duration;
+            node_handle_.getParam("/itomp_planner/trajectory_duration", duration);
+            node_handle_.setParam("/itomp_planner/trajectory_duration", duration - 1.0);
+
+            //break;
         }
 
         double current_time = ros::Time::now().toSec();
@@ -196,8 +202,6 @@ void MoveKukaIIWA::run(const std::string& group_name)
             ros::WallDuration sleep_t(time_to_sleep);
             sleep_t.sleep();
         }
-
-        display_publisher_.publish(display_trajectory);
 
         last_trajectory_start_time = ros::Time::now().toSec();
         last_trajectory_duration = (end_effector_poses.size() - 1) * 2.0;
@@ -229,13 +233,21 @@ bool MoveKukaIIWA::initTask(std::vector<Eigen::Affine3d>& end_effector_poses, st
         start_state = *last_goal_state_;
     }
     const Eigen::Affine3d& start_frame = start_state.getGlobalLinkTransform(end_effector_name);
-    end_effector_poses.push_back(start_frame);
+    //end_effector_poses.push_back(start_frame);
 
     // set task
     std::vector<TASK_FRAME_INDEX> task_frame_indices;
+    /*
     int frame_row = rand() % 10;
     int frame_col = rand() % 65;
     int frame_dir = rand() % 2;
+    */
+    int frame_row = 0;
+    int frame_col = 55;
+    int frame_dir = 1;
+    task_frame_indices.push_back(TASK_FRAME_INDEX(frame_row, frame_col, frame_dir));
+    task_frame_indices.push_back(TASK_FRAME_INDEX(frame_row, frame_col, frame_dir));
+    task_frame_indices.push_back(TASK_FRAME_INDEX(frame_row, frame_col, frame_dir));
     task_frame_indices.push_back(TASK_FRAME_INDEX(frame_row, frame_col, frame_dir));
 
     for (int i = 0; i < task_frame_indices.size(); ++i)
@@ -263,7 +275,7 @@ bool MoveKukaIIWA::initTask(std::vector<Eigen::Affine3d>& end_effector_poses, st
     }
 
     robot_states.resize(end_effector_poses.size(), start_state);
-    for (int i = 1; i < robot_states.size(); ++i)
+    for (int i = 0; i < robot_states.size(); ++i)
     {
         robot_states[i].update();
         if (computeIKState(robot_states[i], end_effector_poses[i]) == false)

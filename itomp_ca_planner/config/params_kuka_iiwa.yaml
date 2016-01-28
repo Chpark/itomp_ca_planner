@@ -1,7 +1,7 @@
 num_trials: 1
 planning_time_limit: 120.0
 max_iterations: 2000
-max_iterations_after_collision_free: 100
+max_iterations_after_collision_free: 1
 num_trajectories: 1
 
 precomputation_init_milestones: 5000
@@ -82,5 +82,4 @@ environment_model_scale: 1.0
 
 has_root_6d: false
 
-input_sequence: 5
-
+input_sequence: 6
