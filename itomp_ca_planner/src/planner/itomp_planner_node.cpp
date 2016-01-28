@@ -218,7 +218,7 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
             {
                 processed_points = first_violation_point;
             }
-            if (first_violation_point == num_planning_step_points && duration == 0.5 * num_planning_step_points)
+            if (first_violation_point == num_planning_step_points && duration == 0.05 * num_planning_step_points)
             {
                 processed_points = num_planning_step_points - 1;
             }
