@@ -1357,7 +1357,6 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
 
     int safe_begin = max(0, begin);
     int safe_end = min(num_points_, end);
-    ROS_INFO("num_points : %d %d", num_points_, end);
 
     //for (int current_point = 0; current_point < safe_end; current_point += replanning_frames)
     {
@@ -1451,7 +1450,6 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
                 if (full_traj_index < first_violation_point_)
                 {
                     first_violation_point_ = full_traj_index;
-                    ROS_INFO("set FVP : %d", full_traj_index);
                 }
             }
         }
