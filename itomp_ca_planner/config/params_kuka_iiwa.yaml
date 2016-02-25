@@ -76,13 +76,14 @@ num_contacts: 0
 contact_variable_initial_values: [0.2, 0.2, 0.0, 0.0]
 contact_variable_goal_values: [0.2, 0.2, 0.0, 0.0]
 
-environment_model: package://move_kuka/env/SME_Aufnahmetisch_base_s.dae
-environment_model_position: [0.0, 0.0, 0.0]
+environment_model: package://pred_kuka/env/table.dae
+environment_model_position: [0.2, 0.0, -0.71]
 environment_model_scale: 1.0
 
 has_root_6d: false
 
-input_sequence: 6
-sensor_error: 0.05
 collision_probability: 0.95
-exact_collision_detection: true
+exact_collision_detection: false
+
+source_position: [0.0, 0.7, 0.05]
+action_positions: [0.6, 0.3, 0.05,  0.6, 0.1, 0.05,  0.6, -0.1, 0.05,  0.6, -0.3, 0.05,  0.4, 0.3, 0.05,  0.4, 0.1, 0.05,  0.4, -0.1, 0.05,  0.4, -0.3, 0.05]

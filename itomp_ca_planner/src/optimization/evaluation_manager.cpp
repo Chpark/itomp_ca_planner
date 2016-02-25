@@ -530,6 +530,7 @@ void EvaluationManager::render(int trajectory_index, bool is_best)
         VisualizationManager::getInstance()->animatePath(trajectory_index, getFullTrajectoryConst(), is_best, planning_group_->name_);
         VisualizationManager::getInstance()->animateCollisionSpheres(trajectory_index, getFullTrajectoryConst(), is_best, planning_group_->name_);
 
+        /*
         static int last_current_point = -1;
         static pcpred::MarkerArrayVisualizer visualizer("obstacles");
 
@@ -548,6 +549,7 @@ void EvaluationManager::render(int trajectory_index, bool is_best)
                 visualizer.drawGaussianDistributions(ns, mu, sigma, 0.95, offset);
             }
         }
+        */
 	}
 
 	if (PlanningParameters::getInstance()->getAnimateEndeffector())
@@ -1364,6 +1366,8 @@ void EvaluationManager::computeSingularityCosts(int begin, int end)
 
 void EvaluationManager::computePointCloudCosts(int begin, int end)
 {
+    return;
+
     bool exact_collision_detection = PlanningParameters::getInstance()->getExactCollisionDetection();
 
 
@@ -1499,6 +1503,8 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
 
 void EvaluationManager::preprocessPointCloud()
 {
+    return;
+
     ros::NodeHandle node_handle("~");
     node_handle.getParam("/itomp_planner/current_point", current_point_);
 
