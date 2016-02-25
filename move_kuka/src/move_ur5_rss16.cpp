@@ -59,11 +59,50 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <sched.h>
 #include <limits>
 #include <resource_retriever/retriever.h>
+#include <pcpred/prediction/kinect_predictor.h>
+#include <pcpred/visualization/marker_array_visualizer.h>
 
 using namespace std;
 
 const int M = 8;
 static int PLANNER_INDEX = -1;
+
+
+
+
+void readStartGoalStates(const char* filename, std::vector<robot_state::RobotState>& robot_states)
+{
+    FILE* fp = fopen(filename, "r");
+
+    for (int i=0; i<robot_states.size(); i++)
+    {
+        for (int j=0; j<robot_states[i].getVariableCount(); j++)
+        {
+            double v;
+            fscanf(fp, "%lf", &v);
+            robot_states[i].setVariablePosition(j, v);
+        }
+        robot_states[i].update();
+    }
+
+    fclose(fp);
+}
+
+void writeStartGoalStates(const char* filename, const std::vector<robot_state::RobotState>& robot_states)
+{
+    FILE* fp = fopen(filename, "w");
+
+    for (int i=0; i<robot_states.size(); i++)
+    {
+        for (int j=0; j<robot_states[i].getVariableCount(); j++)
+            fprintf(fp, "%lf ", robot_states[i].getVariablePosition(j));
+        fprintf(fp, "\n");
+    }
+
+    fclose(fp);
+}
+
+
 
 namespace move_ur5
 {
@@ -206,6 +245,9 @@ void MoveUR5::run(const std::string& group_name)
         break;
     }
 
+    drawResults(display_trajectory);
+    animateResults(display_trajectory);
+
     // clean up
     itomp_planner_instance_.reset();
     planning_scene_.reset();
@@ -246,18 +288,31 @@ bool MoveUR5::initTask(std::vector<Eigen::Affine3d>& end_effector_poses, std::ve
         end_effector_poses.push_back(target_frame);
     }
 
+
+
+    const bool read_from_file = true;
+    const char filename[] = "910.txt";
+
     robot_states.resize(end_effector_poses.size(), start_state);
-    for (int i = 0; i < robot_states.size(); ++i)
+
+    if (read_from_file)
     {
-        robot_states[i].update();
-        if (computeIKState(robot_states[i], end_effector_poses[i]) == false)
-        {
-            ROS_INFO("[%d] : fail", i);
-            return false;
-        }
+        readStartGoalStates(filename, robot_states);
     }
 
-    ROS_INFO("Success");
+    else
+    {
+        for (int i = 0; i < robot_states.size(); ++i)
+        {
+            robot_states[i].update();
+            if (computeIKState(robot_states[i], end_effector_poses[i]) == false)
+            {
+                return false;
+            }
+        }
+
+        writeStartGoalStates("tmpu.txt", robot_states);
+    }
     return true;
 }
 
@@ -866,6 +921,321 @@ void MoveUR5::drawFrames()
     ros::WallDuration sleep_time(0.01);
     sleep_time.sleep();
 }
+
+void MoveUR5::drawResults(moveit_msgs::DisplayTrajectory& display_trajectory)
+{
+    ros::NodeHandle node_handle;
+    ros::Publisher publisher = node_handle.advertise<visualization_msgs::MarkerArray>("result", 10);
+
+    ros::Duration(3.0).sleep();
+
+    const int step = 10;
+
+    std_msgs::ColorRGBA ROBOT;
+    ROBOT.r = 0.5; ROBOT.g = 0.5; ROBOT.b = 0.5;
+    ROBOT.a = 0.5;
+
+    std_msgs::ColorRGBA ORANGE;
+    ORANGE.r = 1.0; ORANGE.g = 0.6; ORANGE.b = 0.0;
+    ORANGE.a = 1.0;
+
+    std_msgs::ColorRGBA GRAY;
+    GRAY.r = GRAY.g = GRAY.b = 0.5;
+    GRAY.a = 0.25;
+
+    std::vector<std::string> link_names = robot_model_->getJointModelGroup("ur5")->getLinkModelNames();
+
+    const int num_points = display_trajectory.trajectory[0].joint_trajectory.points.size();
+
+    visualization_msgs::MarkerArray ma;
+
+    visualization_msgs::Marker marker;
+    marker.header.frame_id = "base_link";
+    marker.header.stamp = ros::Time::now();
+    marker.id = 0;
+    marker.ns = "path";
+    marker.type = visualization_msgs::Marker::LINE_STRIP;
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.pose.position.x = 0;
+    marker.pose.position.y = 0;
+    marker.pose.position.z = 0;
+    marker.pose.orientation.x = 0.0;
+    marker.pose.orientation.y = 0.0;
+    marker.pose.orientation.z = 0.0;
+    marker.pose.orientation.w = 1.0;
+    marker.scale.x = 0.05;
+    marker.lifetime = ros::Duration();
+
+    for (int point=0; point<num_points; point++)
+    {
+        geometry_msgs::Point p;
+        std_msgs::ColorRGBA c;
+
+        robot_state::RobotState robot_state(robot_model_);
+        robot_state.setVariablePositions( display_trajectory.trajectory[0].joint_trajectory.points[point].positions );
+        robot_state.updateLinkTransforms();
+
+        const Eigen::Affine3d& t = robot_state.getFrameTransform("power_grasp_link");
+        p.x = t.translation()(0);
+        p.y = t.translation()(1);
+        p.z = t.translation()(2);
+
+        const double s = (double)point / (num_points - 1);
+        c.r = (1-s) * 1.0 + s * 0.0;
+        c.g = (1-s) * 0.6 + s * 0.0;
+        c.b = (1-s) * 0.0 + s * 1.0;
+        c.a = 1.0;
+
+        marker.points.push_back(p);
+        marker.colors.push_back(c);
+    }
+
+    ma.markers.push_back(marker);
+
+    for (int point=0; point<num_points; point += step)
+    {
+        visualization_msgs::MarkerArray ma_point;
+
+        robot_state::RobotState robot_state(robot_model_);
+        robot_state.setVariablePositions( display_trajectory.trajectory[0].joint_trajectory.points[point].positions );
+        robot_state.updateLinkTransforms();
+        std::string ns = "path_" + boost::lexical_cast<std::string>(point);
+        robot_state.getRobotMarkers(ma_point, link_names, ROBOT, ns, ros::Duration());
+
+        for (int i=0; i<ma_point.markers.size(); i++)
+        {
+            ma_point.markers[i].mesh_use_embedded_materials = true;
+        }
+
+        ma.markers.insert(ma.markers.end(), ma_point.markers.begin(), ma_point.markers.end());
+    }
+
+    publisher.publish(ma);
+}
+
+
+
+
+
+
+void MoveUR5::animateResults(moveit_msgs::DisplayTrajectory& display_trajectory)
+{
+    ros::NodeHandle node_handle;
+    ros::Publisher publisher = node_handle.advertise<visualization_msgs::MarkerArray>("result_video", 10);
+
+    ros::Duration(3.0).sleep();
+
+    const int step = 10;
+
+    std_msgs::ColorRGBA ROBOT;
+    ROBOT.r = 0.5; ROBOT.g = 0.5; ROBOT.b = 0.5;
+    ROBOT.a = 1.0;
+
+    std_msgs::ColorRGBA ORANGE;
+    ORANGE.r = 1.0; ORANGE.g = 0.6; ORANGE.b = 0.0;
+    ORANGE.a = 1.0;
+
+    std_msgs::ColorRGBA GRAY;
+    GRAY.r = GRAY.g = GRAY.b = 0.5;
+    GRAY.a = 0.25;
+
+    std::vector<std::string> link_names = robot_model_->getJointModelGroup("ur5")->getLinkModelNames();
+
+    const int num_points = display_trajectory.trajectory[0].joint_trajectory.points.size();
+
+
+
+
+
+
+
+
+
+
+
+
+    pcpred::KinectPredictor pc_predictor_;
+
+    const double timestep = 0.05;               // 0.05 s
+    double sensor_error = 0.005;          // 1 mm
+    double collision_probability = 0.95;  // 95%
+    const int acceleration_inference_window_size = 5;
+
+    node_handle.param("/itomp_planner/sensor_error", sensor_error, 0.005);
+    node_handle.param("/itomp_planner/collision_probability", collision_probability, 0.95);
+
+    /* Sequence 1: left hand, slow, forth
+     * Sequence 2: right hand, slow, forth
+     * Sequence 3: left hand, fast, forth
+     * Sequence 4: right hand, fast, forth
+     * Sequence 5: left hand, left up
+     * Sequence 6: left hand, left down
+     */
+    const int sequence_number = 9;
+    const Eigen::Vector3d pointcloud_translates[] =
+    {
+        Eigen::Vector3d(0.1, -0.7, -0.9),
+        Eigen::Vector3d(0.18, 1, -0.9),
+        Eigen::Vector3d(0, -0.5, -0.9),
+        Eigen::Vector3d(-0.2, 0.7, -0.9),
+        Eigen::Vector3d(0.75, -0.9, -0.9),
+        Eigen::Vector3d(0.75, -0.8, -0.9),
+        Eigen::Vector3d(5.0, -0.0, -0.9),
+        Eigen::Vector3d(5.0, -0.0, -0.9),
+        Eigen::Vector3d(0.8, 2.5, -0.5),
+        Eigen::Vector3d(0.7, 1.7, -0.6),
+    };
+    const double z_rotations[] =
+    {
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -30.0 / 180.0 * M_PI,
+        -15.0 / 180.0 * M_PI,
+        0.0,
+        0.0,
+        -90.0 / 180.0 * M_PI,
+        -90.0 / 180.0 * M_PI,
+    };
+
+    // initialize predictor
+    pc_predictor_.setSequence( sequence_number );
+    pc_predictor_.setTimestep(timestep);
+    pc_predictor_.setSensorDiagonalCovariance(sensor_error * sensor_error);   // variance is proportional to square of sensing error
+    pc_predictor_.setCollisionProbability(collision_probability);
+    pc_predictor_.setAccelerationInferenceWindowSize(acceleration_inference_window_size);
+    pc_predictor_.setVisualizerTopic("bvh_prediction_test");
+
+    pc_predictor_.setMaximumIterations(5);
+    pc_predictor_.setGradientDescentMaximumIterations(5);
+    pc_predictor_.setGradientDescentAlpha(0.005);
+    pc_predictor_.setHumanShapeLengthConstraintEpsilon(0.01);
+
+    // transform
+    pc_predictor_.translate( Eigen::Vector3d(0.4, 0.0, 0.0) );
+    pc_predictor_.rotate( z_rotations[sequence_number - 1], Eigen::Vector3d(0, 0, 1) );
+    pc_predictor_.translate( Eigen::Vector3d(-0.4, 0.0, 0.0) );
+    pc_predictor_.translate( pointcloud_translates[sequence_number - 1] );
+
+    const double sequence_duration = 7.0;
+    const int sequence_end = sequence_duration / timestep;
+    const int end = num_points;
+
+    // skip 1 sec
+    /*
+    for (int i=0; i<30; i++)
+        pc_predictor_.getInstance()->moveToNextFrame();
+        */
+
+    std::vector<std::vector<std::vector<Eigen::Vector3d> > > mu;
+    std::vector<std::vector<std::vector<Eigen::Matrix3d> > > sigma;
+    std::vector<double> radius;
+
+    mu.resize(end);
+    sigma.resize(end);
+    for (int i = 0; i < end; ++i)
+    {
+        pc_predictor_.moveToNextFrame();
+
+        mu[i].resize(20);
+        sigma[i].resize(20);
+
+        std::vector<Eigen::Vector3d> mus;
+        std::vector<Eigen::Matrix3d> sigmas;
+
+        for (int j = 0; j < 20; ++j)
+        {
+            pc_predictor_.getPredictedGaussianDistribution(j * timestep, mus, sigmas, radius);
+            mu[i][j] = mus;
+            sigma[i][j] = sigmas;
+        }
+    }
+
+    pcpred::MarkerArrayVisualizer visualizer("result2");
+
+
+    ros::Rate rate(20);
+    while (true)
+    {
+        visualization_msgs::MarkerArray ma;
+
+        visualization_msgs::Marker marker;
+        marker.header.frame_id = "/base_link";
+        marker.header.stamp = ros::Time::now();
+        marker.id = 0;
+        marker.ns = "path_ee";
+        marker.type = visualization_msgs::Marker::LINE_STRIP;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.pose.position.x = 0;
+        marker.pose.position.y = 0;
+        marker.pose.position.z = 0;
+        marker.pose.orientation.x = 0.0;
+        marker.pose.orientation.y = 0.0;
+        marker.pose.orientation.z = 0.0;
+        marker.pose.orientation.w = 1.0;
+        marker.scale.x = 0.05;
+        marker.lifetime = ros::Duration();
+
+        for (int point=0; point<num_points; point++)
+        {
+            geometry_msgs::Point p;
+            std_msgs::ColorRGBA c;
+
+            robot_state::RobotState robot_state(robot_model_);
+            robot_state.setVariablePositions( display_trajectory.trajectory[0].joint_trajectory.points[point].positions );
+            robot_state.updateLinkTransforms();
+
+            const Eigen::Affine3d& t = robot_state.getFrameTransform("power_grasp_link");
+            p.x = t.translation()(0);
+            p.y = t.translation()(1);
+            p.z = t.translation()(2);
+
+            const double s = (double)point / (num_points - 1);
+            c.r = (1-s) * 1.0 + s * 0.0;
+            c.g = (1-s) * 0.6 + s * 0.0;
+            c.b = (1-s) * 0.0 + s * 1.0;
+            c.a = 1.0;
+
+            marker.points.push_back(p);
+            marker.colors.push_back(c);
+        }
+
+        ma.markers.push_back(marker);
+        publisher.publish(ma);
+
+
+
+        for (int point=0; point<num_points; point ++)
+        {
+            visualization_msgs::MarkerArray ma_point;
+
+            robot_state::RobotState robot_state(robot_model_);
+            robot_state.setVariablePositions( display_trajectory.trajectory[0].joint_trajectory.points[point].positions );
+            robot_state.updateLinkTransforms();
+            std::string ns = "path";
+            robot_state.getRobotMarkers(ma_point, link_names, ROBOT, ns, ros::Duration());
+
+            for (int i=0; i<ma_point.markers.size(); i++)
+            {
+                ma_point.markers[i].mesh_use_embedded_materials = true;
+            }
+
+            int j=10;
+            visualizer.drawGaussianDistributions("obstacles1", mu[point][j], sigma[point][j], 0.95, radius);
+            j=19;
+            visualizer.drawGaussianDistributions("obstacles2", mu[point][j], sigma[point][j], 0.95, radius);
+            j=0;
+            visualizer.drawGaussianDistributions("obstacles3", mu[point][j], sigma[point][j], 0.95, radius);
+
+            publisher.publish(ma_point);
+            rate.sleep();
+        }
+    }
+}
+
+
+
 
 }
 

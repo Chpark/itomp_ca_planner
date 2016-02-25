@@ -51,6 +51,8 @@ protected:
         void drawPath(int id, const Eigen::Vector3d& from, const Eigen::Vector3d& to);
 	void drawEndeffectorPosition(int id, const Eigen::Vector3d& position);
         void drawFrames();
+        void drawResults(moveit_msgs::DisplayTrajectory& display_trajectory);
+        void animateResults(moveit_msgs::DisplayTrajectory& display_trajectory);
 
 	ros::NodeHandle node_handle_;
 	robot_model::RobotModelPtr robot_model_;

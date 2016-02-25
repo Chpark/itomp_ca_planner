@@ -15,6 +15,8 @@
   <depend package="interactive_markers"/>
   <depend package="roscpp"/>
   <depend package="resource_retriever"/>
+  <depend package="pcpred"/>
+  <depend package="itomp_ca_planner"/>
 </package>
 
 

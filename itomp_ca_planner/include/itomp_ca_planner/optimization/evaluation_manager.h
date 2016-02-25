@@ -56,6 +56,7 @@ namespace itomp_ca_planner
 class ItompPlanningGroup;
 class EvaluationManager
 {
+public:
         class BackupData
         {
         public:

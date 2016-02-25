@@ -264,6 +264,8 @@ void PlanningParameters::initFromNodeHandle()
 
     node_handle.param("input_sequence",
                       input_sequence_, 1);
+    node_handle.param("exact_collision_detection",
+                      exact_collision_detection_, false);
 }
 
 } // namespace

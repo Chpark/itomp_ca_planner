@@ -127,7 +127,7 @@ void VisualizationManager::renderEnvironment()
 	msg.color.r = 0.5;
 	msg.color.g = 0.5;
 	msg.color.b = 0.5;
-	msg.mesh_resource = environment_file;
+    msg.mesh_resource = environment_file;
 	ma.markers.push_back(msg);
 	vis_marker_array_publisher_.publish(ma);
 }

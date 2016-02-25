@@ -48,6 +48,7 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <itomp_ca_planner/util/vector_util.h>
 #include <itomp_ca_planner/util/multivariate_gaussian.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <pcpred/visualization/marker_array_visualizer.h>
 #include <iostream>
 
 using namespace std;
@@ -528,6 +529,25 @@ void EvaluationManager::render(int trajectory_index, bool is_best)
 	{
         VisualizationManager::getInstance()->animatePath(trajectory_index, getFullTrajectoryConst(), is_best, planning_group_->name_);
         VisualizationManager::getInstance()->animateCollisionSpheres(trajectory_index, getFullTrajectoryConst(), is_best, planning_group_->name_);
+
+        static int last_current_point = -1;
+        static pcpred::MarkerArrayVisualizer visualizer("obstacles");
+
+        if (last_current_point != current_point_)
+        {
+            last_current_point = current_point_;
+            for (int i=0; i<point_cloud_data_[current_point_].size(); i++)
+            {
+                char ns[128];
+                sprintf(ns, "obstalce_%d", i);
+
+                std::vector<Eigen::Vector3d> mu = point_cloud_data_[current_point_][i].mu_;
+                std::vector<Eigen::Matrix3d> sigma = point_cloud_data_[current_point_][i].sigma_inverse_;
+                for (int i=0; i<sigma.size(); i++) sigma[i] = sigma[i].inverse();
+                std::vector<double> offset = point_cloud_sphere_sizes_;
+                visualizer.drawGaussianDistributions(ns, mu, sigma, 0.95, offset);
+            }
+        }
 	}
 
 	if (PlanningParameters::getInstance()->getAnimateEndeffector())
@@ -1344,6 +1364,10 @@ void EvaluationManager::computeSingularityCosts(int begin, int end)
 
 void EvaluationManager::computePointCloudCosts(int begin, int end)
 {
+    bool exact_collision_detection = PlanningParameters::getInstance()->getExactCollisionDetection();
+
+
+
     if (PlanningParameters::getInstance()->getPointCloudCostWeight() == 0.0)
         return;
 
@@ -1373,7 +1397,11 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
             if (current_point_ >= point_cloud_data_.size() || full_traj_index >= point_cloud_data_[current_point_].size())
                 continue;
 
-            const PointCloudData& pcd = point_cloud_data_[current_point_][full_traj_index];
+            const PointCloudData& pcd =
+                    exact_collision_detection ?
+                        point_cloud_data_[current_point_ + full_traj_index][0] :
+                        point_cloud_data_[current_point_][full_traj_index];
+
             for (std::size_t k = 0; k < num_all_joints; k++)
             {
                 positions[thread_num][k] = (*getFullTrajectory())(full_traj_index, k);
@@ -1401,43 +1429,56 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
 
                         Eigen::Vector3d xmax;
 
-                        if(diff.norm() <= radius)
-                            xmax = pcd.mu_[j];
+
+
+                        // exact collision detection
+                        if (exact_collision_detection)
+                        {
+                            if (diff.norm() <= radius)
+                                max_collision_probability = 1.0;
+                        }
+
+                        // probabilistic collision detection
                         else
                         {
-                            /*
-                            // find xmax using binary search
-                            double l=0, h=100000000;
-                            xmax = global_position;
-                            int it = 0;
-                            while (h-l > 1e-5)
+                            if(diff.norm() <= radius)
+                                xmax = pcd.mu_[j];
+                            else
                             {
-                                double lambda = (l+h)/2;
-                                Eigen::Vector3d xc = (pcd.sigma_inverse_[j] + lambda * Eigen::Matrix3d::Identity()).inverse() * (pcd.sigma_inverse_[j] * pcd.mu_[j] + lambda * global_position);
-                                //printf("lambda %lf norm %lf\n", lambda, (xc - global_position).norm());
-                                double diff = (xc - global_position).squaredNorm() - radius * radius;
-                                if (std::abs(diff) <= 1e-5)
+                                /*
+                                // find xmax using binary search
+                                double l=0, h=100000000;
+                                xmax = global_position;
+                                int it = 0;
+                                while (h-l > 1e-5)
                                 {
-                                    xmax = xc;
-                                    break;
+                                    double lambda = (l+h)/2;
+                                    Eigen::Vector3d xc = (pcd.sigma_inverse_[j] + lambda * Eigen::Matrix3d::Identity()).inverse() * (pcd.sigma_inverse_[j] * pcd.mu_[j] + lambda * global_position);
+                                    //printf("lambda %lf norm %lf\n", lambda, (xc - global_position).norm());
+                                    double diff = (xc - global_position).squaredNorm() - radius * radius;
+                                    if (std::abs(diff) <= 1e-5)
+                                    {
+                                        xmax = xc;
+                                        break;
+                                    }
+                                    if (diff < 0) h = lambda;
+                                    else l = lambda;
+
+                                    it++;
                                 }
-                                if (diff < 0) h = lambda;
-                                else l = lambda;
+                                //printf("xmaxdiff %lf radius %lf iteration %d\n", (xmax - global_position).norm(), radius, it);
+                                //fflush(stdout);
+                                */
 
-                                it++;
+                                // find xmax to the direction of mu
+                                xmax = global_position + (pcd.mu_[j] - global_position).normalized() * radius;
                             }
-                            //printf("xmaxdiff %lf radius %lf iteration %d\n", (xmax - global_position).norm(), radius, it);
-                            //fflush(stdout);
-                            */
+                            diff = xmax - pcd.mu_[j];
 
-                            // find xmax to the direction of mu
-                            xmax = global_position + (pcd.mu_[j] - global_position).normalized() * radius;
+                            double max_point_probability = 1.0 / std::sqrt(std::pow(2 * M_PI, 3) * pcd.determinant_[j]) * std::exp(-0.5 * diff.transpose() * pcd.sigma_inverse_[j] * diff);
+
+                            max_collision_probability = std::max(max_collision_probability, std::min(1.0, max_point_probability * volume));
                         }
-                        diff = xmax - pcd.mu_[j];
-
-                        double max_point_probability = 1.0 / std::sqrt(std::pow(2 * M_PI, 3) * pcd.determinant_[j]) * std::exp(-0.5 * diff.transpose() * pcd.sigma_inverse_[j] * diff);
-
-                        max_collision_probability = std::max(max_collision_probability, std::min(1.0, max_point_probability * volume));
                     }
                 }
             }
@@ -1468,9 +1509,12 @@ void EvaluationManager::preprocessPointCloud()
             if (!pc_predictor_.isCreated())
             {
                 const double timestep = 0.05;               // 0.05 s
-                const double sensor_error = 0.001;          // 1 mm
-                const double collision_probability = 0.95;  // 95%
+                double sensor_error = 0.005;          // 1 mm
+                double collision_probability = 0.95;  // 95%
                 const int acceleration_inference_window_size = 5;
+
+                node_handle.param("/itomp_planner/sensor_error", sensor_error, 0.005);
+                node_handle.param("/itomp_planner/collision_probability", collision_probability, 0.95);
 
                 /* Sequence 1: left hand, slow, forth
                  * Sequence 2: right hand, slow, forth
@@ -1486,8 +1530,12 @@ void EvaluationManager::preprocessPointCloud()
                     Eigen::Vector3d(0.18, 1, -0.9),
                     Eigen::Vector3d(0, -0.5, -0.9),
                     Eigen::Vector3d(-0.2, 0.7, -0.9),
-                    Eigen::Vector3d(1.0, -0.5, 0.1),
-                    Eigen::Vector3d(0.7, -0.7, -0.9),
+                    Eigen::Vector3d(0.75, -0.9, -0.9),
+                    Eigen::Vector3d(0.75, -0.8, -0.9),
+                    Eigen::Vector3d(5.0, -0.0, -0.9),
+                    Eigen::Vector3d(5.0, -0.0, -0.9),
+                    Eigen::Vector3d(0.0, -0.0, -0.9),
+                    Eigen::Vector3d(0.0, -0.0, -0.9),
                 };
                 const double z_rotations[] =
                 {
@@ -1496,7 +1544,11 @@ void EvaluationManager::preprocessPointCloud()
                     0.0,
                     0.0,
                     -30.0 / 180.0 * M_PI,
-                    -30.0 / 180.0 * M_PI,
+                    -15.0 / 180.0 * M_PI,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
                 };
 
                 // initialize predictor
@@ -1518,9 +1570,18 @@ void EvaluationManager::preprocessPointCloud()
                 pc_predictor_.getInstance()->translate( Eigen::Vector3d(-0.4, 0.0, 0.0) );
                 pc_predictor_.getInstance()->translate( pointcloud_translates[sequence_number - 1] );
 
+                const double sequence_duration = 7.0;
+                const int sequence_end = sequence_duration / timestep;
+                const int end = std::max(full_vars_end_ - 1, sequence_end);
+
+                // skip 1 sec
+                /*
+                for (int i=0; i<30; i++)
+                    pc_predictor_.getInstance()->moveToNextFrame();
+                    */
+
                 singleton_point_cloud_data_.getInstance()->clear();
-                ros::Rate rate(30);
-                for (int i = 0; i < full_vars_end_ - 1; ++i)
+                for (int i = 0; i < end; ++i)
                 {
                     //if (i==0)
                         pc_predictor_.getInstance()->moveToNextFrame();

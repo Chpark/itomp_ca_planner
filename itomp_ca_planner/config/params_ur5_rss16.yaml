@@ -33,7 +33,7 @@ ridge_factor: 0.0
 
 temp: [1000.0, 1000.0, 0.0]
 
-print_planning_info: true
+print_planning_info: false
 
 animate_path: true
 animate_endeffector: true
@@ -84,4 +84,7 @@ environment_model_scale: 1.0
 
 has_root_6d: false
 
-input_sequence: 5
+input_sequence: 9
+sensor_error: 0.005
+collision_probability: 0.95
+exact_collision_detection: false

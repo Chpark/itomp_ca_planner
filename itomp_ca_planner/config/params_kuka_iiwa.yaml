@@ -1,6 +1,6 @@
 num_trials: 1
 planning_time_limit: 120.0
-max_iterations: 2000
+max_iterations: 100
 max_iterations_after_collision_free: 1
 num_trajectories: 1
 
@@ -27,7 +27,7 @@ cartesian_trajectory_cost_weight: 0.0
 singularity_cost_weight: 0.0
 point_cloud_cost_weight: 10.0
 smoothness_cost_velocity: 10.0
-smoothness_cost_acceleration: 0.01
+smoothness_cost_acceleration: 0.1
 smoothness_cost_jerk: 0.0
 ridge_factor: 0.0
 
@@ -83,3 +83,6 @@ environment_model_scale: 1.0
 has_root_6d: false
 
 input_sequence: 6
+sensor_error: 0.05
+collision_probability: 0.95
+exact_collision_detection: true

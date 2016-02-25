@@ -142,6 +142,7 @@ public:
 	bool getDrawPrecomputation();
 
     int getInputSequence() const;
+    bool getExactCollisionDetection() const;
 
 private:
 	int updateIndex;
@@ -213,6 +214,7 @@ private:
 	bool draw_precomputation_;
 
     int input_sequence_;
+    bool exact_collision_detection_;
 
 	friend class Singleton<PlanningParameters> ;
 };
@@ -479,6 +481,11 @@ inline bool PlanningParameters::getDrawPrecomputation()
 inline int PlanningParameters::getInputSequence() const
 {
     return input_sequence_;
+}
+
+inline bool PlanningParameters::getExactCollisionDetection() const
+{
+    return exact_collision_detection_;
 }
 
 }

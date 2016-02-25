@@ -8,8 +8,8 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 #  RelWithDebInfo : w/ debug symbols, w/ optimization
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
 #set(ROS_BUILD_TYPE RelWithDebInfo)
-set(ROS_BUILD_TYPE Debug)
-#set(ROS_BUILD_TYPE Release)
+#set(ROS_BUILD_TYPE Debug)
+set(ROS_BUILD_TYPE Release)
 
 rosbuild_init()
 
@@ -31,4 +31,6 @@ rosbuild_add_executable(move_kuka_bench2 src/move_kuka_bench2.cpp)
 rosbuild_add_executable(move_kuka_bench3 src/move_kuka_bench3.cpp)
 rosbuild_add_executable(move_kuka_iiwa src/move_kuka_iiwa.cpp)
 rosbuild_link_boost(move_kuka_iiwa serialization)
+target_link_libraries(move_kuka_iiwa pcpred)
 rosbuild_add_executable(move_ur5_rss16 src/move_ur5_rss16.cpp)
+target_link_libraries(move_ur5_rss16 pcpred)
