@@ -106,6 +106,8 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
         const planning_interface::MotionPlanRequest &req,
         planning_interface::MotionPlanResponse &res)
 {
+    EvaluationManager::destroyPredictor();
+
     if (req.planner_id == "ITOMP_3steps")
         return plan3StepPath(planning_scene, req, res);
     use_workspace_initial_trajectory_ = (req.planner_id == "ITOMP_workspace") ? true : false;
@@ -209,7 +211,7 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
             //trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->printTrajectory();
 
             int first_violation_point = optimizers_[best_cost_manager_.getBestCostTrajectoryIndex()]->getFirstViolationPoint();
-            ROS_INFO("current time %f duration : %f FVP : %d", current_point * 0.05, duration, first_violation_point);
+            //ROS_INFO("current time %f duration : %f FVP : %d", current_point * 0.05, duration, first_violation_point);
 
             int num_joints = trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->getTrajectory().cols();
 
@@ -226,7 +228,7 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
             previous_trajectory = trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->getTrajectory().block(processed_points, 0,
                     trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->getTrajectory().rows() - processed_points,
                     num_joints);
-            ROS_INFO("rows,cols : %d %d", previous_trajectory.rows(), previous_trajectory.cols());
+            //ROS_INFO("rows,cols : %d %d", previous_trajectory.rows(), previous_trajectory.cols());
             start_extra_trajectory = trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->getTrajectory().block(
                         std::max(0, processed_points - 5), 0,
                         std::min(5, (int)(trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->getTrajectory().rows() - processed_points)), num_joints);
@@ -664,7 +666,7 @@ void ItompPlannerNode::fillInResult(const std::vector<std::string>& planningGrou
                                     bool append, int length, int duplicate)
 {
 	int best_trajectory_index = best_cost_manager_.getBestCostTrajectoryIndex();
-    ROS_INFO("Best Trajectory index : %d", best_trajectory_index);
+    //ROS_INFO("Best Trajectory index : %d", best_trajectory_index);
 
     const std::map<std::string, double>& joint_velocity_limits = PlanningParameters::getInstance()->getJointVelocityLimits();
 
@@ -679,7 +681,7 @@ void ItompPlannerNode::fillInResult(const std::vector<std::string>& planningGrou
     if (length == -1)
         length = trajectories_[best_trajectory_index]->getNumPoints();
 
-    trajectories_[best_trajectory_index]->printTrajectory();
+    //trajectories_[best_trajectory_index]->printTrajectory();
 
     std::vector<double> velocity_limits(num_all_joints, std::numeric_limits<double>::max());
 
@@ -708,6 +710,7 @@ void ItompPlannerNode::fillInResult(const std::vector<std::string>& planningGrou
     if (PlanningParameters::getInstance()->getPrintPlanningInfo())
     {
         const std::vector<std::string>& joint_names = res.trajectory_->getFirstWayPoint().getVariableNames();
+        /*
         for (int j = 0; j < num_all_joints; j++)
             printf("%s ", joint_names[j].c_str());
         printf("\n");
@@ -719,6 +722,7 @@ void ItompPlannerNode::fillInResult(const std::vector<std::string>& planningGrou
             }
             printf("\n");
         }
+        */
     }
 
 }
@@ -1214,6 +1218,7 @@ bool ItompPlannerNode::computeIKSolutions(const robot_state::RobotState& robot_s
     }
 
     int order = 0;
+    /*
     ROS_INFO("Start : [%f %f %f %f %f %f]",
              robot_state.getVariablePositions()[0],
              robot_state.getVariablePositions()[1],
@@ -1221,10 +1226,12 @@ bool ItompPlannerNode::computeIKSolutions(const robot_state::RobotState& robot_s
              robot_state.getVariablePositions()[3],
              robot_state.getVariablePositions()[4],
              robot_state.getVariablePositions()[5]);
+             */
 
     for (it = disjoint_states.begin(); it != disjoint_states.end(); ++it)
     {
         const robot_state::RobotState& state = it->robot_state_;
+        /*
         ROS_INFO("%d : %d [%f %f %f %f %f %f] %f %d",
                  order++,
                  it->index_,
@@ -1236,6 +1243,7 @@ bool ItompPlannerNode::computeIKSolutions(const robot_state::RobotState& robot_s
                  state.getVariablePositions()[5],
                  it->dist_,
                  it->neighbor_index_);
+                 */
     }
 
     ik_solution_states.resize(disjoint_states.size(), robot_state);

@@ -48,7 +48,7 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <kdl/jntarray.hpp>
 #include <ros/publisher.h>
 #include <moveit/planning_scene/planning_scene.h>
-#include <pcpred/prediction/kinect_predictor.h>
+#include <pcpred/learning/future_motion.h>
 #include <pcpred/util/singleton.h>
 
 namespace itomp_ca_planner
@@ -88,6 +88,7 @@ public:
            std::vector<Eigen::Vector3d> mu_;
            std::vector<Eigen::Matrix3d> sigma_inverse_;
            std::vector<double> determinant_;
+           std::vector<double> weight_;
         };
 
 public:
@@ -99,6 +100,8 @@ public:
         EvaluationManager(int* iteration);
         EvaluationManager() {};
         virtual ~EvaluationManager();
+
+        static void destroyPredictor();
 
         void initialize(ItompCIOTrajectory *full_trajectory, ItompCIOTrajectory *group_trajectory,
                                         ItompRobotModel *robot_model, const ItompPlanningGroup *planning_group, double planning_start_time,
@@ -207,7 +210,8 @@ private:
 
         BackupData backup_data_;
 
-        pcpred::Singleton<pcpred::KinectPredictor> pc_predictor_;
+        static bool predictor_need_destroy_;
+        pcpred::Singleton<pcpred::FutureMotion> pc_predictor_;
         pcpred::Singleton<std::vector<std::vector<PointCloudData> > > singleton_point_cloud_data_;
         std::vector<std::vector<PointCloudData> > point_cloud_data_;
         pcpred::Singleton<std::vector<double> > singleton_point_cloud_sphere_sizes_;

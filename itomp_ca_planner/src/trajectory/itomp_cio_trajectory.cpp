@@ -369,7 +369,7 @@ void ItompCIOTrajectory::fillInMinJerk(
 		double x1 = (*this)(end_index, i);
         double v0 = 0.0;
         double a0 = 0.0;
-		ROS_INFO("Joint %d from %f(%f %f) to %f", i, x0, v0, a0, x1);
+        //ROS_INFO("Joint %d from %f(%f %f) to %f", i, x0, v0, a0, x1);
 
 		v0 = v0 * duration;
 		a0 = a0 * duration * duration;

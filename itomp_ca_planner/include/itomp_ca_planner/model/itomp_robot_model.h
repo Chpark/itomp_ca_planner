@@ -202,7 +202,7 @@ inline void ItompRobotModel::jointStateToArray(const sensor_msgs::JointState &jo
 		Eigen::MatrixXd::RowXpr joint_array, Eigen::MatrixXd::RowXpr joint_vel_array,
 		Eigen::MatrixXd::RowXpr joint_acc_array)
 {
-	ROS_INFO("Initial Joint States");
+    //ROS_INFO("Initial Joint States");
 	for (unsigned int i = 0; i < joint_state.name.size(); i++)
 	{
 		std::string name = joint_state.name[i];
@@ -214,8 +214,10 @@ inline void ItompRobotModel::jointStateToArray(const sensor_msgs::JointState &jo
 					(joint_state.velocity.size() > i) ? joint_state.velocity[i] : 0.0;
 			joint_acc_array(kdl_number) =
 					(joint_state.effort.size() > i) ? joint_state.effort[i] : 0.0;
+            /*
 			ROS_INFO("%s : %f %f %f", name.c_str(), joint_array(kdl_number),
 					joint_vel_array(kdl_number), joint_acc_array(kdl_number));
+                    */
 		}
 	}
 }

@@ -51,6 +51,12 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <pcpred/visualization/marker_array_visualizer.h>
 #include <iostream>
 
+#include <string>
+
+#include <stdio.h>
+
+#include <omp.h>
+
 using namespace std;
 using namespace Eigen;
 
@@ -64,6 +70,9 @@ static bool STABILITY_COST_VERBOSE = false;
 const int replanning_frames = 0;
 const int prediction_frames = 20;
 
+// static member declaration
+bool EvaluationManager::predictor_need_destroy_ = false;
+
 EvaluationManager::EvaluationManager(int* iteration) :
     iteration_(iteration), data_(&default_data_), count_(0), current_point_(0), first_violation_point_(std::numeric_limits<int>::max())
 {
@@ -72,7 +81,6 @@ EvaluationManager::EvaluationManager(int* iteration) :
 
 EvaluationManager::~EvaluationManager()
 {
-
 }
 
 void EvaluationManager::initialize(ItompCIOTrajectory *full_trajectory,
@@ -1366,12 +1374,6 @@ void EvaluationManager::computeSingularityCosts(int begin, int end)
 
 void EvaluationManager::computePointCloudCosts(int begin, int end)
 {
-    return;
-
-    bool exact_collision_detection = PlanningParameters::getInstance()->getExactCollisionDetection();
-
-
-
     if (PlanningParameters::getInstance()->getPointCloudCostWeight() == 0.0)
         return;
 
@@ -1402,8 +1404,6 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
                 continue;
 
             const PointCloudData& pcd =
-                    exact_collision_detection ?
-                        point_cloud_data_[current_point_ + full_traj_index][0] :
                         point_cloud_data_[current_point_][full_traj_index];
 
             for (std::size_t k = 0; k < num_all_joints; k++)
@@ -1427,6 +1427,9 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
 
                     for (unsigned int j = 0; j < pcd.mu_.size(); ++j)
                     {
+                        if (pcd.weight_[j] == 0.0)
+                            continue;
+
                         double radius = collision_spheres[k].radius_ + point_cloud_sphere_sizes_[j];
                         double volume = 4.0 / 3.0 * M_PI * radius * radius * radius;
                         Eigen::Vector3d diff = global_position - pcd.mu_[j];
@@ -1436,7 +1439,7 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
 
 
                         // exact collision detection
-                        if (exact_collision_detection)
+                        if (false)
                         {
                             if (diff.norm() <= radius)
                                 max_collision_probability = 1.0;
@@ -1481,7 +1484,7 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
 
                             double max_point_probability = 1.0 / std::sqrt(std::pow(2 * M_PI, 3) * pcd.determinant_[j]) * std::exp(-0.5 * diff.transpose() * pcd.sigma_inverse_[j] * diff);
 
-                            max_collision_probability = std::max(max_collision_probability, std::min(1.0, max_point_probability * volume));
+                            max_collision_probability = std::max(max_collision_probability, std::min(1.0, max_point_probability * volume) * pcd.weight_[j]);
                         }
                     }
                 }
@@ -1501,12 +1504,27 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
     }
 }
 
+void EvaluationManager::destroyPredictor()
+{
+    predictor_need_destroy_ = true;
+}
+
 void EvaluationManager::preprocessPointCloud()
 {
-    return;
-
     ros::NodeHandle node_handle("~");
     node_handle.getParam("/itomp_planner/current_point", current_point_);
+
+    if (predictor_need_destroy_)
+    {
+        #pragma omp critical
+        {
+            if (predictor_need_destroy_)
+            {
+                pc_predictor_.destroy();
+                predictor_need_destroy_ = false;
+            }
+        }
+    }
 
     if (!pc_predictor_.isCreated())
     {
@@ -1514,104 +1532,50 @@ void EvaluationManager::preprocessPointCloud()
         {
             if (!pc_predictor_.isCreated())
             {
-                const double timestep = 0.05;               // 0.05 s
-                double sensor_error = 0.005;          // 1 mm
-                double collision_probability = 0.95;  // 95%
-                const int acceleration_inference_window_size = 5;
+                printf("Load pointcloud load\n");
+                fflush(stdout);
 
-                node_handle.param("/itomp_planner/sensor_error", sensor_error, 0.005);
-                node_handle.param("/itomp_planner/collision_probability", collision_probability, 0.95);
-
-                /* Sequence 1: left hand, slow, forth
-                 * Sequence 2: right hand, slow, forth
-                 * Sequence 3: left hand, fast, forth
-                 * Sequence 4: right hand, fast, forth
-                 * Sequence 5: left hand, left up
-                 * Sequence 6: left hand, left down
-                 */
-                const int sequence_number = PlanningParameters::getInstance()->getInputSequence();
-                const Eigen::Vector3d pointcloud_translates[] =
-                {
-                    Eigen::Vector3d(0.1, -0.7, -0.9),
-                    Eigen::Vector3d(0.18, 1, -0.9),
-                    Eigen::Vector3d(0, -0.5, -0.9),
-                    Eigen::Vector3d(-0.2, 0.7, -0.9),
-                    Eigen::Vector3d(0.75, -0.9, -0.9),
-                    Eigen::Vector3d(0.75, -0.8, -0.9),
-                    Eigen::Vector3d(5.0, -0.0, -0.9),
-                    Eigen::Vector3d(5.0, -0.0, -0.9),
-                    Eigen::Vector3d(0.0, -0.0, -0.9),
-                    Eigen::Vector3d(0.0, -0.0, -0.9),
-                };
-                const double z_rotations[] =
-                {
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    -30.0 / 180.0 * M_PI,
-                    -15.0 / 180.0 * M_PI,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                };
+                std::string filename;
+                node_handle.getParam("/itomp_planner/obstacle_filename", filename);
 
                 // initialize predictor
-                pc_predictor_.getInstance()->setSequence( sequence_number );
-                pc_predictor_.getInstance()->setTimestep(timestep);
-                pc_predictor_.getInstance()->setSensorDiagonalCovariance(sensor_error * sensor_error);   // variance is proportional to square of sensing error
-                pc_predictor_.getInstance()->setCollisionProbability(collision_probability);
-                pc_predictor_.getInstance()->setAccelerationInferenceWindowSize(acceleration_inference_window_size);
+                pc_predictor_.getInstance()->loadSavedData(filename.c_str());
                 pc_predictor_.getInstance()->setVisualizerTopic("bvh_prediction_test");
 
-                pc_predictor_.getInstance()->setMaximumIterations(5);
-                pc_predictor_.getInstance()->setGradientDescentMaximumIterations(5);
-                pc_predictor_.getInstance()->setGradientDescentAlpha(0.005);
-                pc_predictor_.getInstance()->setHumanShapeLengthConstraintEpsilon(0.01);
-
-                // transform
-                pc_predictor_.getInstance()->translate( Eigen::Vector3d(0.4, 0.0, 0.0) );
-                pc_predictor_.getInstance()->rotate( z_rotations[sequence_number - 1], Eigen::Vector3d(0, 0, 1) );
-                pc_predictor_.getInstance()->translate( Eigen::Vector3d(-0.4, 0.0, 0.0) );
-                pc_predictor_.getInstance()->translate( pointcloud_translates[sequence_number - 1] );
+                const int fps = 15;
+                const double timestep = 1. / fps;
 
                 const double sequence_duration = 7.0;
                 const int sequence_end = sequence_duration / timestep;
                 const int end = std::max(full_vars_end_ - 1, sequence_end);
 
-                // skip 1 sec
-                /*
-                for (int i=0; i<30; i++)
-                    pc_predictor_.getInstance()->moveToNextFrame();
-                    */
-
                 singleton_point_cloud_data_.getInstance()->clear();
                 for (int i = 0; i < end; ++i)
                 {
-                    //if (i==0)
-                        pc_predictor_.getInstance()->moveToNextFrame();
-
                     std::vector<PointCloudData> frame_prediction_data(prediction_frames);
 
                     for (int j = 0; j < prediction_frames; ++j)
                     {
                         PointCloudData& pcd = frame_prediction_data[j];
                         std::vector<Eigen::Matrix3d> sigma;
-                        pc_predictor_.getInstance()->getPredictedGaussianDistribution(j * timestep, pcd.mu_, sigma, *(singleton_point_cloud_sphere_sizes_.getInstance()));
+                        std::vector<double> weights;
+                        pc_predictor_.getInstance()->getGaussianDistributions(i * timestep, j * timestep, pcd.mu_, sigma, *(singleton_point_cloud_sphere_sizes_.getInstance()), weights);
                         pcd.determinant_.resize(sigma.size());
                         pcd.sigma_inverse_.resize(sigma.size());
+                        pcd.weight_.resize(sigma.size());
                         for (int k = 0; k < sigma.size(); ++k)
                         {
                             pcd.determinant_[k] = sigma[k].determinant();
                             pcd.sigma_inverse_[k] = sigma[k].inverse();
+                            pcd.weight_[k] = weights[k];
                         }
-                        //if (i == 0)
-                            pc_predictor_.getInstance()->visualizePrediction(j * timestep);
+
+                        char ns[128];
+                        sprintf(ns, "prediction_%03d_%02d", i, j);
+                        pc_predictor_.getInstance()->visualizePrediction(ns, i * timestep, j * timestep);
                     }
                     singleton_point_cloud_data_.getInstance()->push_back(frame_prediction_data);
                 }
-                pc_predictor_.getInstance()->visualizePointcloud();
                 pc_predictor_.getInstance()->visualizeHuman();
             }
         }

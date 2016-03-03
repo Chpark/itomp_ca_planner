@@ -221,7 +221,7 @@ void ImprovementManagerChomp::initializeCosts()
         inv_control_costs_.push_back(cost_free.fullPivLu().inverse());
     }
 
-    ROS_INFO("Precomputing projection matrices..");
+    //ROS_INFO("Precomputing projection matrices..");
     projection_matrix_.resize(num_dimensions_);
     for (int d = 0; d < num_dimensions_; ++d)
     {
@@ -244,7 +244,7 @@ void ImprovementManagerChomp::initializeCosts()
             projection_matrix_[d].setIdentity(inv_control_costs_[d].rows(), inv_control_costs_[d].cols());
         }
     }
-    ROS_INFO("Done precomputing projection matrices.");
+    //ROS_INFO("Done precomputing projection matrices.");
 }
 
 void ImprovementManagerChomp::initializeNoiseGenerators()

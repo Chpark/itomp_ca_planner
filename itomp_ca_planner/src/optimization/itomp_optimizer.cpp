@@ -103,7 +103,7 @@ bool ItompOptimizer::optimize()
 	evaluation_manager_.updateFullTrajectory();
 	evaluation_manager_.evaluate();
 
-    updateBestTrajectory(evaluation_manager_.getTrajectoryCost(trajectory_index_, true));
+    updateBestTrajectory(evaluation_manager_.getTrajectoryCost(trajectory_index_, false));
 	++iteration_;
 
 	int iteration_after_solution = 0;
@@ -129,7 +129,7 @@ bool ItompOptimizer::optimize()
 
 
 			is_feasible = evaluation_manager_.isLastTrajectoryFeasible();
-            bool is_updated = updateBestTrajectory(evaluation_manager_.getTrajectoryCost(trajectory_index_, true));
+            bool is_updated = updateBestTrajectory(evaluation_manager_.getTrajectoryCost(trajectory_index_, false));
 
             bool is_best_trajectory = best_cost_manager_->updateBestCost(trajectory_index_, best_group_trajectory_cost_,
                                       is_feasible);
