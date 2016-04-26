@@ -70,8 +70,7 @@ static bool STABILITY_COST_VERBOSE = false;
 const int replanning_frames = 0;
 const int prediction_frames = 20;
 
-// static member declaration
-bool EvaluationManager::predictor_need_destroy_ = false;
+bool EvaluationManager::destroy_predictor_ = false;
 
 EvaluationManager::EvaluationManager(int* iteration) :
     iteration_(iteration), data_(&default_data_), count_(0), current_point_(0), first_violation_point_(std::numeric_limits<int>::max())
@@ -564,7 +563,7 @@ void EvaluationManager::render(int trajectory_index, bool is_best)
 	{
         VisualizationManager::getInstance()->animateEndeffector(trajectory_index, full_vars_start_, full_vars_end_,
                 data_->segment_frames_, is_best);
-	}
+    }
 }
 
 void EvaluationManager::computeMassAndGravityForce()
@@ -1377,6 +1376,15 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
     if (PlanningParameters::getInstance()->getPointCloudCostWeight() == 0.0)
         return;
 
+
+    // current point
+    ros::NodeHandle nh;
+    nh.getParam("/itomp_planner/current_point", current_point_);
+
+
+    // load point clouds at current time
+    loadPointCloudAtCurrentPoint();
+
     int num_all_joints = data_->kinematic_state_[0]->getVariableCount();
     int num_threads = getNumParallelThreads();
     std::vector<std::vector<double> > positions(num_threads);
@@ -1430,7 +1438,7 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
                         if (pcd.weight_[j] == 0.0)
                             continue;
 
-                        double radius = collision_spheres[k].radius_ + point_cloud_sphere_sizes_[j];
+                        double radius = collision_spheres[k].radius_ + pcd.sphere_size_[j];
                         double volume = 4.0 / 3.0 * M_PI * radius * radius * radius;
                         Eigen::Vector3d diff = global_position - pcd.mu_[j];
 
@@ -1477,7 +1485,7 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
                                 //fflush(stdout);
                                 */
 
-                                // find xmax to the direction of mu
+                                // find xmax to the direction of mu, assuming that variances along all axes are similar
                                 xmax = global_position + (pcd.mu_[j] - global_position).normalized() * radius;
                             }
                             diff = xmax - pcd.mu_[j];
@@ -1504,34 +1512,64 @@ void EvaluationManager::computePointCloudCosts(int begin, int end)
     }
 }
 
-void EvaluationManager::destroyPredictor()
+void EvaluationManager::loadPointCloudAtCurrentPoint()
 {
-    predictor_need_destroy_ = true;
-}
+    ros::NodeHandle nh;
+    nh.getParam("/itomp_planner/current_point", current_point_);
 
-void EvaluationManager::preprocessPointCloud()
-{
-    ros::NodeHandle node_handle("~");
-    node_handle.getParam("/itomp_planner/current_point", current_point_);
+    std::vector<std::vector<PointCloudData> >* shared_point_cloud_data = singleton_point_cloud_data_.getInstance();
 
-    if (predictor_need_destroy_)
+    if (shared_point_cloud_data->size() <= current_point_)
     {
         #pragma omp critical
         {
-            if (predictor_need_destroy_)
+            while (shared_point_cloud_data->size() <= current_point_)
             {
-                pc_predictor_.destroy();
-                predictor_need_destroy_ = false;
-            }
-        }
-    }
+                // move next frame
+                // current time discretization is 0.05
+                pcpred::MotionPredictor* predictor = motion_predictor_.getInstance();
+                predictor->moveToFuture( 0.05 );
 
-    if (!pc_predictor_.isCreated())
-    {
-        #pragma omp critical
-        {
-            if (!pc_predictor_.isCreated())
-            {
+                // motion data fps
+                const int fps = 20;
+                const double timestep = 1. / fps;
+
+                std::vector<PointCloudData> frame_prediction_data(prediction_frames);
+                for (int i=0; i < prediction_frames; i++)
+                {
+                    // predict
+                    const double future_time = i * timestep;
+                    std::vector<Eigen::Vector3d> mu;
+                    std::vector<Eigen::Matrix3d> sigma;
+                    std::vector<double> offsets;
+                    std::vector<double> weights;
+                    predictor->getPredictedEllipsoids(future_time, mu, sigma, offsets, weights);
+
+                    // import data
+                    PointCloudData& pcd = frame_prediction_data[i];
+                    pcd.mu_.resize(sigma.size());
+                    pcd.determinant_.resize(sigma.size());
+                    pcd.sigma_inverse_.resize(sigma.size());
+                    pcd.sphere_size_.resize(sigma.size());
+                    pcd.weight_.resize(sigma.size());
+                    for (int k = 0; k < sigma.size(); ++k)
+                    {
+                        pcd.mu_[k] = mu[k];
+                        pcd.determinant_[k] = sigma[k].determinant();
+                        pcd.sigma_inverse_[k] = sigma[k].inverse();
+                        pcd.sphere_size_[k] = offsets[k];
+                        pcd.weight_[k] = weights[k];
+                    }
+                }
+                shared_point_cloud_data->push_back(frame_prediction_data);
+
+                // visualize predicted motions
+                predictor->visualizeFutureMotion();
+                predictor->visualizeHuman();
+                static ros::Rate rate(33);
+                rate.sleep();
+
+                /*
                 printf("Load pointcloud load\n");
                 fflush(stdout);
 
@@ -1576,13 +1614,55 @@ void EvaluationManager::preprocessPointCloud()
                     }
                     singleton_point_cloud_data_.getInstance()->push_back(frame_prediction_data);
                 }
-                pc_predictor_.getInstance()->visualizeHuman();
+                */
             }
         }
     }
 
-    point_cloud_data_ = *(singleton_point_cloud_data_.getInstance());
-    point_cloud_sphere_sizes_ = *(singleton_point_cloud_sphere_sizes_.getInstance());
+    point_cloud_data_ = *shared_point_cloud_data;
+}
+
+void EvaluationManager::preprocessPointCloud()
+{
+    // initialize motion predictor, if not initialized outside
+    if (!motion_predictor_.isCreated())
+    {
+        #pragma omp critical
+        {
+            if (!motion_predictor_.isCreated())
+            {
+                pcpred::MotionPredictor* predictor = motion_predictor_.getInstance();
+
+                ros::NodeHandle node_handle;
+
+                std::string directory_name;
+                node_handle.getParam("/itomp_planner/obstacle_directory", directory_name);
+                int benchmark_number;
+                node_handle.getParam("/itomp_planner/benchmark_number", benchmark_number);
+
+                predictor->initialize(directory_name, benchmark_number);
+            }
+        }
+    }
+
+    // clear obstacles from previous planning
+    if (destroy_predictor_)
+    {
+        #pragma omp critical
+        {
+            if (destroy_predictor_)
+            {
+                destroy_predictor_ = false;
+                std::vector<std::vector<PointCloudData> >* shared_point_cloud_data = singleton_point_cloud_data_.getInstance();
+                shared_point_cloud_data->clear();
+            }
+        }
+    }
+}
+
+void EvaluationManager::destroyPredictor()
+{
+    destroy_predictor_ = true;
 }
 
 }

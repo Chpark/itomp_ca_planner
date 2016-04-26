@@ -48,7 +48,7 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <kdl/jntarray.hpp>
 #include <ros/publisher.h>
 #include <moveit/planning_scene/planning_scene.h>
-#include <pcpred/learning/future_motion.h>
+#include <pcpred/learning/motion_predictor.h>
 #include <pcpred/util/singleton.h>
 
 namespace itomp_ca_planner
@@ -88,8 +88,11 @@ public:
            std::vector<Eigen::Vector3d> mu_;
            std::vector<Eigen::Matrix3d> sigma_inverse_;
            std::vector<double> determinant_;
+           std::vector<double> sphere_size_;
            std::vector<double> weight_;
         };
+
+        static void destroyPredictor();
 
 public:
         enum DERIVATIVE_VARIABLE_TYPE
@@ -100,8 +103,6 @@ public:
         EvaluationManager(int* iteration);
         EvaluationManager() {};
         virtual ~EvaluationManager();
-
-        static void destroyPredictor();
 
         void initialize(ItompCIOTrajectory *full_trajectory, ItompCIOTrajectory *group_trajectory,
                                         ItompRobotModel *robot_model, const ItompPlanningGroup *planning_group, double planning_start_time,
@@ -140,6 +141,7 @@ public:
 private:
         double evaluate(DERIVATIVE_VARIABLE_TYPE variable_type, int point_index, int joint_index);
 
+        void loadPointCloudAtCurrentPoint();
         void preprocessPointCloud();
         bool performForwardKinematics();
         void computeTrajectoryValidity();
@@ -210,12 +212,10 @@ private:
 
         BackupData backup_data_;
 
-        static bool predictor_need_destroy_;
-        pcpred::Singleton<pcpred::FutureMotion> pc_predictor_;
+        static bool destroy_predictor_;
+        pcpred::Singleton<pcpred::MotionPredictor> motion_predictor_;
         pcpred::Singleton<std::vector<std::vector<PointCloudData> > > singleton_point_cloud_data_;
         std::vector<std::vector<PointCloudData> > point_cloud_data_;
-        pcpred::Singleton<std::vector<double> > singleton_point_cloud_sphere_sizes_;
-        std::vector<double> point_cloud_sphere_sizes_;
 
         // TODO: refactoring
         int getSegmentIndex(int link, bool isLeft) const;

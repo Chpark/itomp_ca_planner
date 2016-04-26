@@ -656,8 +656,8 @@ void VisualizationManager::setPlanningGroup(
 void VisualizationManager::animateEndeffector(int trajectory_index, int point_start, int point_end,
 		const vector<vector<KDL::Frame> >& segmentFrames, bool best)
 {
-	const double scale = 0.005;
-    const double scale2 = 0.0025;
+    const double scale = 0.05;
+    const double scale2 = 0.025;
     const int marker_step = 1;
 
     visualization_msgs::MarkerArray ma;
@@ -986,12 +986,14 @@ void VisualizationManager::animateCoM(int numFreeVars, int freeVarStartIndex,
 void VisualizationManager::animatePath(int trajectory_index,
                                        const ItompCIOTrajectory* traj, bool is_best, const std::string& group_name)
 {
+    const int step = 2;
+
 	if (!is_best)
 		return;
 
     std::vector<std::string> link_names = robot_model_->getRobotModel()->getJointModelGroup(group_name)->getLinkModelNames();
 
-	std_msgs::ColorRGBA WHITE, YELLOW, RED;
+    std_msgs::ColorRGBA WHITE, YELLOW, RED, GRAY, DIMGRAY;
 	WHITE.a = 1.0;
 	WHITE.r = 1.0;
 	WHITE.g = 1.0;
@@ -1004,20 +1006,30 @@ void VisualizationManager::animatePath(int trajectory_index,
 	RED.r = 1.0;
 	RED.g = 0.0;
 	RED.b = 0.0;
+    GRAY.a = 1.0;
+    GRAY.r = 0.35;
+    GRAY.g = 0.35;
+    GRAY.b = 0.35;
+    DIMGRAY.a = 0.2;
+    DIMGRAY.r = 0.35;
+    DIMGRAY.g = 0.35;
+    DIMGRAY.b = 0.35;
 	ros::Duration dur(100.0);
 
 	visualization_msgs::MarkerArray ma;
-	for (int point = 0; point < traj->getNumPoints(); point += 10)
+    for (int point = 0; point < traj->getNumPoints(); point += step)
 	{
 		visualization_msgs::MarkerArray ma_point;
 		const Eigen::MatrixXd& mat = traj->getTrajectoryPoint(point);
 		robot_states_[trajectory_index]->setVariablePositions(mat.data());
 		robot_states_[trajectory_index]->updateLinkTransforms();
 		std::string ns = "wp_" + boost::lexical_cast<std::string>(point);
-        robot_states_[trajectory_index]->getRobotMarkers(ma_point, link_names, WHITE, ns, dur);
+        robot_states_[trajectory_index]->getRobotMarkers(ma_point, link_names, point == 0 ? GRAY : DIMGRAY, ns, dur);
         ma.markers.insert(ma.markers.end(), ma_point.markers.begin(), ma_point.markers.end());
-	}
-	int marker_size = ma.markers.size();
+
+        // now only the first waypoint is shown
+        break;
+    }
 
 	vis_marker_array_publisher_.publish(ma);
 }

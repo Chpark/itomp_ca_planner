@@ -39,7 +39,7 @@ animate_path: true
 animate_endeffector: true
 animate_endeffector_segment:
   lower_body: [revetting_tcp]
-  whole_body: [revetting_tcp]
+  whole_body: [revetting_tool]
   lower_body_tcp2: [tcp_2_link]
   lower_body_tcp3: [tcp_3_link]
   torso: torso_x_link
@@ -88,3 +88,6 @@ exact_collision_detection: false
 source_position: [0.0, 0.7, 0.05]
 action_positions: [0.6, 0.3, 0.05,  0.6, 0.1, 0.05,  0.6, -0.1, 0.05,  0.6, -0.3, 0.05,  0.4, 0.3, 0.05,  0.4, 0.1, 0.05,  0.4, -0.1, 0.05,  0.4, -0.3, 0.05]
 obstacle_filename: package://pred_kuka/data/motion.txt
+
+obstacle_directory: /home/jaesungp/indigo_workspace/jaesung/pred_kuka/data
+benchmark_number: 3

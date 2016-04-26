@@ -50,6 +50,7 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <moveit/robot_state/robot_state.h>
 #include <moveit/robot_state/conversions.h>
 #include <Eigen/Geometry>
+#include <ros/ros.h>
 
 using namespace std;
 
@@ -222,7 +223,7 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
             }
             if (first_violation_point == num_planning_step_points && duration == 0.05 * num_planning_step_points)
             {
-                processed_points = num_planning_step_points - 1;
+                processed_points = num_planning_step_points - 5;
             }
 
             previous_trajectory = trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->getTrajectory().block(processed_points, 0,
