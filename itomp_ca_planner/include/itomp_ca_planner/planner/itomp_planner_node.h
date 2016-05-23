@@ -108,6 +108,9 @@ private:
 	fillInResult(const std::vector<std::string>& planningGroups,
                  planning_interface::MotionPlanResponse &res,
                  bool append = false, int length = -1, int duplicate = 0);
+    
+    // convert full trajectory to group trajectory with less columns
+    Eigen::MatrixXd copyGroupTrajectoryFromFullTrajectory(const ItompPlanningGroup* planning_group, const Eigen::MatrixXd& full_trajectory) const;
 
 	ItompRobotModel robot_model_;
 

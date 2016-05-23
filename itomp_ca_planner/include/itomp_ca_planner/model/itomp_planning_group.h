@@ -62,6 +62,7 @@ public:
 
 	std::vector<std::string> getJointNames() const;
 	int getNumContacts() const;
+    int getNumJoints() const;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -69,6 +70,11 @@ public:
 inline int ItompPlanningGroup::getNumContacts() const
 {
 	return contactPoints_.size();
+}
+
+inline int ItompPlanningGroup::getNumJoints() const
+{
+    return group_joints_.size();
 }
 
 }

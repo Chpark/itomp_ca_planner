@@ -255,7 +255,7 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
                 }
                 previous_trajectory = temp;
             }
-
+            
             duration -= 0.05 * processed_points;
 
             if (duration <= 0.0)
@@ -271,6 +271,10 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
             }
 
             fillInResult(planningGroups, res, i > 0, processed_points, std::max(0, num_planning_step_points - processed_points));
+            
+            // extract values corresponding to joints in the planning group
+            const ItompPlanningGroup* group = robot_model_.getPlanningGroup(groupName);
+            start_extra_trajectory = copyGroupTrajectoryFromFullTrajectory(group, start_extra_trajectory);
 
 
 
@@ -284,6 +288,24 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
     }
 
     return true;
+}
+
+Eigen::MatrixXd ItompPlannerNode::copyGroupTrajectoryFromFullTrajectory(const ItompPlanningGroup* planning_group, const Eigen::MatrixXd& full_trajectory) const
+{
+    const int num_points = full_trajectory.rows();
+    const int num_group_joints = planning_group->getNumJoints();
+    Eigen::MatrixXd group_trajectory(num_points, num_group_joints);
+    
+	for (int i = 0; i < num_points; i++)
+	{
+		for (int j = 0; j < num_group_joints; j++)
+		{
+			const int source_joint = planning_group->group_joints_[j].kdl_joint_index_;
+			group_trajectory(i, j) = full_trajectory(i, source_joint);
+		}
+	}
+    
+    return group_trajectory;
 }
 
 bool ItompPlannerNode::plan3StepPath(const planning_scene::PlanningSceneConstPtr& planning_scene,
