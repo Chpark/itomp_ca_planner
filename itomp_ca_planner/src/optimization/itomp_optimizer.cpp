@@ -53,16 +53,21 @@ ItompOptimizer::ItompOptimizer(int trajectory_index,
                                double trajectory_start_time,
                                const moveit_msgs::Constraints& path_constraints,
                                BestCostManager* best_cost_manager,
-                               const planning_scene::PlanningSceneConstPtr& planning_scene) :
-    is_feasible(false), terminated_(false), trajectory_index_(
-        trajectory_index), planning_start_time_(planning_start_time), iteration_(
-            -1), feasible_iteration_(0), last_improvement_iteration_(-1), full_trajectory_(
-				trajectory), group_trajectory_(*full_trajectory_,
-                        planning_group, DIFF_RULE_LENGTH), evaluation_manager_(
-                            &iteration_), best_group_trajectory_(
-                                group_trajectory_.getTrajectory()), best_group_contact_trajectory_(
-                                    group_trajectory_.getContactTrajectory()), best_cost_manager_(
-                                        best_cost_manager)
+                               const planning_scene::PlanningSceneConstPtr& planning_scene,
+                               double replanning_timestep) :
+    is_feasible(false), terminated_(false), 
+    trajectory_index_(trajectory_index),
+    planning_start_time_(planning_start_time),
+    iteration_(-1),
+    feasible_iteration_(0),
+    last_improvement_iteration_(-1),
+    full_trajectory_(trajectory),
+    group_trajectory_(*full_trajectory_,planning_group, DIFF_RULE_LENGTH),
+    evaluation_manager_(&iteration_),
+    best_group_trajectory_(group_trajectory_.getTrajectory()),
+    best_group_contact_trajectory_(group_trajectory_.getContactTrajectory()),
+    best_cost_manager_(best_cost_manager),
+    replanning_timestep_(replanning_timestep)
 {
 	initialize(robot_model, planning_group, trajectory_start_time,
                path_constraints, planning_scene);
@@ -105,12 +110,15 @@ bool ItompOptimizer::optimize()
 
     updateBestTrajectory(evaluation_manager_.getTrajectoryCost(trajectory_index_, false));
 	++iteration_;
-
+    
+    ROS_INFO("Itomp Optimizer Initialization time : %f", (ros::WallTime::now() - start_time).toSec());
+    
 	int iteration_after_solution = 0;
 	int num_iterations = PlanningParameters::getInstance()->getMaxIterations();
 	//if (!evaluation_manager_.isLastTrajectoryFeasible())
 	{
-		while (iteration_ < num_iterations)
+		while (iteration_ < num_iterations && 
+               (replanning_timestep_ == 0.0 || (ros::WallTime::now() - start_time).toSec() <= replanning_timestep_))
 		{
 
 
@@ -125,7 +133,7 @@ bool ItompOptimizer::optimize()
             double start = ros::Time::now().toSec();
 			improvement_manager_->runSingleIteration(iteration_);
             double elapsed = ros::Time::now().toSec() - start;
-            //ROS_INFO("Iteration time : %f", elapsed);
+            ROS_INFO("Iteration time : %f", elapsed);
 
 
 			is_feasible = evaluation_manager_.isLastTrajectoryFeasible();

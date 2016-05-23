@@ -49,6 +49,7 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_state/robot_state.h>
 #include <moveit/robot_state/conversions.h>
+#include <moveit/move_group_interface/move_group.h>
 #include <Eigen/Geometry>
 #include <ros/ros.h>
 
@@ -107,6 +108,9 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
         const planning_interface::MotionPlanRequest &req,
         planning_interface::MotionPlanResponse &res)
 {
+    // initialize trajectory_execution_manager with robot model
+    trajectory_execution_manager_.reset(new trajectory_execution_manager::TrajectoryExecutionManager(robot_model_.getRobotModel()));
+            
     EvaluationManager::destroyPredictor();
 
     if (req.planner_id == "ITOMP_3steps")
@@ -205,9 +209,9 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
             const string& groupName = planningGroups[0];
             VisualizationManager::getInstance()->setPlanningGroup(robot_model_, groupName);
             if (i == 0)
-                trajectoryOptimization(groupName, req, planning_scene);
+                trajectoryOptimization(groupName, req, planning_scene, planning_step);
             else
-                trajectoryOptimization(groupName, req, planning_scene, previous_trajectory, start_extra_trajectory);
+                trajectoryOptimization(groupName, req, planning_scene, previous_trajectory, start_extra_trajectory, planning_step);
 
             //trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->printTrajectory();
 
@@ -272,6 +276,30 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
 
             fillInResult(planningGroups, res, i > 0, processed_points, std::max(0, num_planning_step_points - processed_points));
             
+            // execute with move_group
+            /*
+            planning_interface::MotionPlanResponse res_next_timestep;
+            fillInResult(planningGroups, res_next_timestep, false, processed_points, std::max(0, num_planning_step_points - processed_points));
+            moveit_msgs::MotionPlanResponse response;
+            res_next_timestep.getMessage(response);
+            
+            static moveit::planning_interface::MoveGroup move_group(groupName);
+            moveit::planning_interface::MoveGroup::Plan plan;
+            plan.trajectory_ = response.trajectory;
+            plan.start_state_ = response.trajectory_start;
+            plan.planning_time_ = 0.5; // TODO: fill in the planning time
+            move_group.stop();
+            moveit::planning_interface::MoveItErrorCode error_code = move_group.asyncExecute(plan);
+            ROS_INFO("Execution on replanning: %d ( SUCCESS = 1 )", error_code.val);
+            */
+            
+            // execute with trajectory_execution_manager
+            planning_interface::MotionPlanResponse res_next_timestep;
+            fillInResult(planningGroups, res_next_timestep, false, processed_points, std::max(0, num_planning_step_points - processed_points));
+            moveit_msgs::MotionPlanResponse response;
+            res_next_timestep.getMessage(response);
+            trajectory_execution_manager_->pushAndExecute(response.trajectory);
+            
             // extract values corresponding to joints in the planning group
             const ItompPlanningGroup* group = robot_model_.getPlanningGroup(groupName);
             start_extra_trajectory = copyGroupTrajectoryFromFullTrajectory(group, start_extra_trajectory);
@@ -287,6 +315,8 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
         PlanningParameters::getInstance()->setTrajectoryDuration(total_duration);
     }
 
+    trajectory_execution_manager_.reset();
+    
     return true;
 }
 
@@ -577,7 +607,8 @@ void optimization_thread_function(ItompOptimizerPtr& optimizer)
 
 bool ItompPlannerNode::trajectoryOptimization(const string& groupName,
         const planning_interface::MotionPlanRequest &req,
-        const planning_scene::PlanningSceneConstPtr& planning_scene)
+        const planning_scene::PlanningSceneConstPtr& planning_scene,
+        double replanning_timestep)
 {
     if (fillGroupJointTrajectory(groupName, req, planning_scene) == false)
         return false;
@@ -593,7 +624,8 @@ bool ItompPlannerNode::trajectoryOptimization(const string& groupName,
 	for (int i = 0; i < num_trajectories; ++i)
         optimizers_[i].reset(new ItompOptimizer(i, trajectories_[i].get(), &robot_model_,
                                                 group, planning_start_time_, trajectory_start_time_,
-                                                req.path_constraints, &best_cost_manager_, planning_scene));
+                                                req.path_constraints, &best_cost_manager_, planning_scene,
+                                                replanning_timestep));
 
     std::vector<boost::shared_ptr<boost::thread> > optimization_threads(num_trajectories);
 	for (int i = 0; i < num_trajectories; ++i)
@@ -612,7 +644,8 @@ bool ItompPlannerNode::trajectoryOptimization(const std::string& groupName,
                             const planning_interface::MotionPlanRequest& req,
                             const planning_scene::PlanningSceneConstPtr& planning_scene,
                             const Eigen::MatrixXd& previous_trajectory,
-                            const Eigen::MatrixXd& start_extra_trajectory)
+                            const Eigen::MatrixXd& start_extra_trajectory,
+                            double replanning_timestep)
 {
     if (fillGroupJointTrajectory(groupName, req, planning_scene) == false)
         return false;
@@ -635,7 +668,8 @@ bool ItompPlannerNode::trajectoryOptimization(const std::string& groupName,
     {
         optimizers_[i].reset(new ItompOptimizer(i, trajectories_[i].get(), &robot_model_,
                                                 group, planning_start_time_, trajectory_start_time_,
-                                                req.path_constraints, &best_cost_manager_, planning_scene));
+                                                req.path_constraints, &best_cost_manager_, planning_scene,
+                                                replanning_timestep));
         optimizers_[i]->getGroupTrajectory().getTrajectory().block(0, 0, 5, optimizers_[i]->getGroupTrajectory().getNumJoints()) = start_extra_trajectory;
         //optimizers_[i]->getGroupTrajectory().printTrajectory();
     }

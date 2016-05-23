@@ -55,7 +55,8 @@ public:
 	ItompOptimizer(int trajectory_index, ItompCIOTrajectory* trajectory, ItompRobotModel *robot_model,
 			const ItompPlanningGroup *planning_group, double planning_start_time, double trajectory_start_time,
 			const moveit_msgs::Constraints& path_constraints, BestCostManager* best_cost_manager,
-			const planning_scene::PlanningSceneConstPtr& planning_scene);
+			const planning_scene::PlanningSceneConstPtr& planning_scene,
+            double replanning_timestep = 0.0);
 	virtual ~ItompOptimizer();
 
 	bool optimize();
@@ -92,6 +93,8 @@ private:
 	double best_group_trajectory_cost_;
 
 	BestCostManager* best_cost_manager_;
+    
+    double replanning_timestep_; //!< replanning time limit
 };
 
 typedef boost::shared_ptr<ItompOptimizer> ItompOptimizerPtr;

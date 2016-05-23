@@ -46,6 +46,7 @@ Any questions or comments should be sent to the author chpark@cs.unc.edu
 #include <itomp_ca_planner/optimization/best_cost_manager.h>
 #include <moveit/planning_interface/planning_interface.h>
 #include <moveit/planning_scene/planning_scene.h>
+#include <moveit/trajectory_execution_manager/trajectory_execution_manager.h>
 
 namespace itomp_ca_planner
 {
@@ -93,12 +94,14 @@ private:
                                   const robot_state::RobotStatePtr& goal_state);
     bool trajectoryOptimization(const std::string& groupName,
                                 const planning_interface::MotionPlanRequest& req,
-                                const planning_scene::PlanningSceneConstPtr& planning_scene);
+                                const planning_scene::PlanningSceneConstPtr& planning_scene,
+                                double replanning_timestep = 0.0);
     bool trajectoryOptimization(const std::string& groupName,
                                 const planning_interface::MotionPlanRequest& req,
                                 const planning_scene::PlanningSceneConstPtr& planning_scene,
                                 const Eigen::MatrixXd& previous_trajectory,
-                                const Eigen::MatrixXd& start_extra_trajectory);
+                                const Eigen::MatrixXd& start_extra_trajectory,
+                                double replanning_timestep = 0.0);
     void trajectoryOptimization(const std::string& groupName,
                                 const planning_interface::MotionPlanRequest& req,
                                 const planning_scene::PlanningSceneConstPtr& planning_scene,
@@ -111,6 +114,9 @@ private:
     
     // convert full trajectory to group trajectory with less columns
     Eigen::MatrixXd copyGroupTrajectoryFromFullTrajectory(const ItompPlanningGroup* planning_group, const Eigen::MatrixXd& full_trajectory) const;
+    
+    // execution on replanning
+    trajectory_execution_manager::TrajectoryExecutionManagerPtr trajectory_execution_manager_;
 
 	ItompRobotModel robot_model_;
 
