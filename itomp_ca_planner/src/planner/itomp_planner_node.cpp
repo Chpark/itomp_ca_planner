@@ -107,10 +107,7 @@ int ItompPlannerNode::run()
 bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneConstPtr& planning_scene,
         const planning_interface::MotionPlanRequest &req,
         planning_interface::MotionPlanResponse &res)
-{
-    // initialize trajectory_execution_manager with robot model
-    trajectory_execution_manager_.reset(new trajectory_execution_manager::TrajectoryExecutionManager(robot_model_.getRobotModel()));
-            
+{            
     EvaluationManager::destroyPredictor();
 
     if (req.planner_id == "ITOMP_3steps")
@@ -188,6 +185,73 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
     }
     else
     {
+        // initialize trajectory_execution_manager with robot model
+        // see how it is initialized with ros params at http://docs.ros.org/indigo/api/moveit_ros_planning/html/trajectory__execution__manager_8cpp_source.html#l00074
+        ros::NodeHandle node_handle("~");
+        std::string controller;
+        double value;
+        if (node_handle.getParam("moveit_controller_manager", controller))
+        {
+            trajectory_execution_manager_.reset(new trajectory_execution_manager::TrajectoryExecutionManager(robot_model_.getRobotModel()));
+        }
+        else if (node_handle.getParam("/move_group/moveit_controller_manager", controller))
+        {
+            bool moveit_manage_controllers = false;
+            bool allowed_execution_duration_scaling = false;
+            bool allowed_goal_duration_margin = false;
+            XmlRpc::XmlRpcValue controller_list;
+            bool controller_list_declared = false;
+            
+            node_handle.setParam("moveit_controller_manager", controller);
+            
+            if (node_handle.getParam("/move_group/controller_list", controller_list))
+            {
+                controller_list_declared = true;
+                node_handle.setParam("controller_list", controller_list);
+            }
+            
+            if (node_handle.getParam("/move_group/moveit_manage_controllers", value))
+            {
+                moveit_manage_controllers = true;
+                node_handle.setParam("moveit_manage_controllers", value);
+            }
+            
+            if (node_handle.getParam("/move_group/allowed_execution_duration_scaling", value))
+            {
+                allowed_execution_duration_scaling = true;
+                node_handle.setParam("allowed_execution_duration_scaling", value);
+            }
+            
+            if (node_handle.getParam("/move_group/allowed_goal_duration_margin", value))
+            {
+                allowed_goal_duration_margin = true;
+                node_handle.setParam("allowed_goal_duration_margin", value);
+            }
+            
+            trajectory_execution_manager_.reset(new trajectory_execution_manager::TrajectoryExecutionManager(robot_model_.getRobotModel()));
+            
+            node_handle.deleteParam("moveit_controller_manager");
+            
+            if (controller_list_declared)
+                node_handle.deleteParam("controller_list");
+            
+            if (moveit_manage_controllers)
+                node_handle.deleteParam("moveit_manage_controllers");
+            
+            if (allowed_execution_duration_scaling)
+                node_handle.deleteParam("allowed_execution_duration_scaling");
+            
+            if (allowed_goal_duration_margin)
+                node_handle.deleteParam("allowed_goal_duration_margin");
+        }
+        else
+        {
+            ROS_WARN("Controller is not defined. MoveItFakeControllerManager is used.");
+            node_handle.setParam("moveit_controller_manager", "moveit_fake_controller_manager/MoveItFakeControllerManager");
+            trajectory_execution_manager_.reset(new trajectory_execution_manager::TrajectoryExecutionManager(robot_model_.getRobotModel(), true));
+            node_handle.deleteParam("moveit_controller_manager");
+        }
+        
         double total_duration = PlanningParameters::getInstance()->getTrajectoryDuration();
         double duration = total_duration;
         double planning_step = 0.5;
