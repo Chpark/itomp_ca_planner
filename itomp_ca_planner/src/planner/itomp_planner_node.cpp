@@ -252,10 +252,11 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
             node_handle.deleteParam("moveit_controller_manager");
         }
         
-        double total_duration = PlanningParameters::getInstance()->getTrajectoryDuration();
+        const double total_duration = PlanningParameters::getInstance()->getTrajectoryDuration();
+        const double trajectory_discretization = PlanningParameters::getInstance()->getTrajectoryDiscretization();
         double duration = total_duration;
-        double planning_step = 0.5;
-        int num_planning_step_points = (int)(planning_step / 0.05 + 1e-7);
+        const double planning_step = 0.5;
+        const int num_planning_step_points = (int)(planning_step / trajectory_discretization + 1e-7);
         Eigen::MatrixXd previous_trajectory;
         Eigen::MatrixXd start_extra_trajectory;
         sensor_msgs::JointState start_joint_state = req.start_state.joint_state;
@@ -280,7 +281,7 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
             //trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->printTrajectory();
 
             int first_violation_point = optimizers_[best_cost_manager_.getBestCostTrajectoryIndex()]->getFirstViolationPoint();
-            //ROS_INFO("current time %f duration : %f FVP : %d", current_point * 0.05, duration, first_violation_point);
+            //ROS_INFO("current time %f duration : %f FVP : %d", current_point * trajectory_discretization, duration, first_violation_point);
 
             int num_joints = trajectories_[best_cost_manager_.getBestCostTrajectoryIndex()]->getTrajectory().cols();
 
@@ -289,7 +290,7 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
             {
                 processed_points = first_violation_point;
             }
-            if (first_violation_point == num_planning_step_points && duration == 0.05 * num_planning_step_points)
+            if (first_violation_point == num_planning_step_points && duration == trajectory_discretization * num_planning_step_points)
             {
                 processed_points = num_planning_step_points - 5;
             }
@@ -324,7 +325,7 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
                 previous_trajectory = temp;
             }
             
-            duration -= 0.05 * processed_points;
+            duration -= trajectory_discretization * processed_points;
 
             if (duration <= 0.0)
             {
@@ -372,7 +373,7 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
 
             if (duration <= 0.0)
                 break;
-            duration = std::max(duration, 0.05 * num_planning_step_points);
+            duration = std::max(duration, trajectory_discretization * num_planning_step_points);
 
             current_point += processed_points;
         }
