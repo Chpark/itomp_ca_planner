@@ -378,10 +378,13 @@ bool ItompPlannerNode::planKinematicPath(const planning_scene::PlanningSceneCons
             current_point += processed_points;
         }
         PlanningParameters::getInstance()->setTrajectoryDuration(total_duration);
+        
+        // wait until execution completion
+        while (trajectory_execution_manager_->getLastExecutionStatus() == moveit_controller_manager::ExecutionStatus::RUNNING);
+        
+        trajectory_execution_manager_.reset();
     }
 
-    trajectory_execution_manager_.reset();
-    
     return true;
 }
 
